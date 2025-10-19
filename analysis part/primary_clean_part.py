@@ -21,5 +21,5 @@ def primary_clean(input_file):
             writer.writerow(newrow)
 
 # 测试用
-# if __name__ == '__main__':
-#     primary_clean('1.csv')
+#if __name__ == '__main__':
+    #primary_clean('2.csv')
