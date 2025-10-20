@@ -1,32 +1,61 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Steam游戏数据清理工具 - 课设版
+功能：清洗Steam游戏数据，统一格式
+"""
+
 import csv
 import re
 
+# 固定的文件路径（相对于项目根目录）
 INPUT_FILE = "data/steam_topsellers_simple.csv"
 OUTPUT_FILE = "data/steam_topsellers_simple_cleaned.csv"
 
+
 def clean_title(title):
+    """
+    清理游戏标题
+    逻辑：一次性处理所有空格和特殊符号
+    不会因为多段空格而丢失内容
+    """
     if not title:
         return ""
-
+    
     # 转为字符串并去除首尾空格
     title = str(title).strip()
-    # 把所有多余的空格都变成一个空格
+    
+    # 把所有多余的空格（包括多段连续空格）都变成一个空格
+    # 正则表达式 \s+ 会匹配所有连续的空白字符
+    # 例如："Counter  Strike    2" → "Counter Strike 2"
     title = re.sub(r'\s+', ' ', title)
+    
     # 删除商标符号
     title = re.sub(r'[™®©]', '', title)
+    
     return title
 
 
 def clean_price(price_str):
+    """
+    清理价格
+    - 空字段或只有空格 → 0.0
+    - 只提取数字，不需要识别"Free"等文字
+    """
     if not price_str:  # 空值
         return 0.0
+    
     # 转为字符串并去除空格
     price_str = str(price_str).strip()
+    
     # 如果清理后是空的（原本只有空格）
     if not price_str:
         return 0.0
+    
     # 直接提取数字（包括小数）
+    # 正则表达式 \d+\.?\d* 匹配：123 或 123.45
     numbers = re.findall(r'\d+\.?\d*', price_str)
+    
     # 如果找到数字，返回第一个（因为每格只有一个价格）
     if numbers:
         return float(numbers[0])
@@ -35,11 +64,20 @@ def clean_price(price_str):
 
 
 def clean_date(date_str):
+    """
+    清理发售日期
+    直接返回原值，只去除首尾空格
+    """
     if not date_str:
         return ""
     return str(date_str).strip()
 
+
 def clean_tags(tags_str):
+    """
+    清理标签
+    统一用英文逗号和空格分隔（与原数据格式一致）
+    """
     if not tags_str:
         return ""
     
@@ -53,20 +91,24 @@ def clean_tags(tags_str):
     tags = []
     for tag in tags_str.split(','):
         tag = tag.strip()
-        if tag:
+        if tag:  # 不是空的才添加
             tags.append(tag)
     
-    # 去重
+    # 去重（保持顺序）
     unique_tags = []
     for tag in tags:
         if tag not in unique_tags:
             unique_tags.append(tag)
     
-    # 用英文逗号和空格连接
+    # 用英文逗号和空格连接（格式：Tag1, Tag2, Tag3）
     return ", ".join(unique_tags)
 
 
 def is_valid(row):
+    """
+    验证数据有效性
+    必须有：appid（纯数字）和 title（不为空）
+    """
     # appid 必须存在且是纯数字
     if not row['appid'] or not row['appid'].isdigit():
         return False
@@ -79,8 +121,11 @@ def is_valid(row):
 
 
 def clean_data():
+    """
+    主函数：执行数据清理
+    """
     print("=" * 60)
-    print("数据清理")
+    print("Steam游戏数据清理工具")
     print("=" * 60)
     
     # ========== 步骤1：读取原始数据 ==========
