@@ -1,22 +1,14 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Steam游戏评论爬虫工具 - 简化版
-适合课程设计使用的简单版本
-功能：爬取Steam游戏评论并检测可疑内容
-"""
 
 import re
 import requests
 import time
 from bs4 import BeautifulSoup
 
-# 全局配置 - 直接在代码中定义，不需要外部配置文件
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 }
 
-# 检测规则 - 简化版
+# 检测规则 
 EXTERNAL_LINKS = [
     r"https?://[^\s]+",
     r"www\.[^\s]+\.[a-zA-Z]{2,}"
@@ -32,17 +24,13 @@ SUSPICIOUS_KEYWORDS = [
 ]
 
 CONTACT_PATTERNS = [
-    r"1[3-9]\d{9}",  # 中国手机号
-    r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"  # 邮箱
+    r"1[3-9]\d{9}", 
+    r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}" 
 ]
 
 
 def detect_suspicious_content(text):
-    """
-    检测文本中的可疑内容
-    参数: text - 要检测的文本
-    返回: 字典，包含各种检测结果的数量
-    """
+
     result = {
         'links': 0,
         'keywords': 0,
@@ -74,11 +62,7 @@ def detect_suspicious_content(text):
 
 
 def search_steam_game(game_name):
-    """
-    在Steam上搜索游戏
-    参数: game_name - 游戏名称
-    返回: 游戏信息字典，包含id和name，如果未找到返回None
-    """
+
     try:
         print(f"正在搜索游戏: {game_name}")
         
@@ -86,8 +70,8 @@ def search_steam_game(game_name):
         search_url = "https://store.steampowered.com/search/"
         params = {
             'term': game_name,
-            'category1': 998,  # 游戏分类
-            'l': 'schinese'   # 中文
+            'category1': 998, 
+            'l': 'schinese'  
         }
         
         # 发送请求
@@ -131,11 +115,7 @@ def search_steam_game(game_name):
 
 
 def get_steam_reviews(app_id, max_reviews=30):
-    """
-    获取Steam游戏评论
-    参数: app_id - 游戏ID, max_reviews - 最大评论数
-    返回: 评论列表
-    """
+
     reviews = []
     
     try:
@@ -145,7 +125,7 @@ def get_steam_reviews(app_id, max_reviews=30):
         reviews_url = f"https://steamcommunity.com/app/{app_id}/reviews/"
         
         page = 1
-        max_pages = (max_reviews // 10) + 1  # 每页约10条评论
+        max_pages = (max_reviews // 10) + 1 
         
         while page <= max_pages and len(reviews) < max_reviews:
             print(f"正在获取第 {page} 页评论...")
@@ -181,7 +161,7 @@ def get_steam_reviews(app_id, max_reviews=30):
                     })
             
             page += 1
-            time.sleep(2)  # 延时2秒避免被封
+            time.sleep(2) 
         
         print(f"成功获取 {len(reviews)} 条评论")
         return reviews
@@ -192,11 +172,7 @@ def get_steam_reviews(app_id, max_reviews=30):
 
 
 def analyze_game_reviews(game_name, max_reviews=30):
-    """
-    分析游戏评论的主函数
-    参数: game_name - 游戏名称, max_reviews - 最大评论数
-    返回: 分析结果字典
-    """
+
     print("=" * 50)
     print(f"开始分析游戏: {game_name}")
     print("=" * 50)
@@ -249,15 +225,12 @@ def analyze_game_reviews(game_name, max_reviews=30):
         'game_info': game_info,
         'total_reviews': len(reviews),
         'stats': total_stats,
-        'problem_reviews': problem_reviews[:5]  # 只显示前5个问题评论
+        'problem_reviews': problem_reviews[:5] 
     }
 
 
 def print_analysis_result(result):
-    """
-    打印分析结果
-    参数: result - analyze_game_reviews返回的结果
-    """
+
     if not result:
         return
     
@@ -298,9 +271,7 @@ def print_analysis_result(result):
 
 
 def main():
-    """
-    主程序入口
-    """
+
     print("Steam游戏评论分析工具 - 简化版")
     print("功能: 爬取Steam游戏评论并检测可疑内容")
     print("适用于课程设计")
