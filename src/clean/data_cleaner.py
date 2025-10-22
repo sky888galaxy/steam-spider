@@ -1,250 +1,183 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Steam游戏数据清理模块 - 超简化版
-用于自动清洗从Steam提取的游戏数据
-供主程序调用，无需手动输入
-"""
 
 import csv
 import re
-import os
+
+INPUT_FILE = "data/steam_topsellers_simple.csv"
+OUTPUT_FILE = "data/steam_topsellers_simple_cleaned.csv"
 
 
-def clean_steam_data_auto(input_file, output_file):
-    """
-    自动清理Steam游戏数据 - 主要函数
-    
-    参数：
-        input_file: steam_data_extractor生成的CSV文件路径
-        output_file: 清理后数据的输出文件路径（供数据分析使用）
-    
-    返回：
-        字典格式的结果：
-        - success: 是否成功
-        - input_file: 输入文件路径
-        - output_file: 输出文件路径
-        - original_count: 原始数据条数
-        - cleaned_count: 清理后的数据条数
-        - removed_count: 移除的无效数据条数
-    """
-    
-    print("开始自动清理Steam数据...")
-    print(f"输入文件: {input_file}")
-    print(f"输出文件: {output_file}")
-    
-    # 第1步：读取steam_data_extractor生成的CSV文件
-    original_data = _read_csv_file(input_file)
-    if not original_data:
-        return {'success': False, 'error': '无法读取输入文件'}
-    
-    print(f"原始数据: {len(original_data)} 条")
-    
-    # 第2步：清理数据
-    cleaned_data = []
-    removed_count = 0
-    
-    for row in original_data:
-        # 清理每一行数据
-        cleaned_row = _clean_single_row(row)
-        
-        # 验证数据有效性
-        if _is_valid_row(cleaned_row):
-            cleaned_data.append(cleaned_row)
-        else:
-            removed_count += 1
-    
-    # 第3步：去除重复数据
-    cleaned_data = _remove_duplicates(cleaned_data)
-    
-    print(f"清理完成: {len(cleaned_data)} 条有效数据，移除 {removed_count} 条无效数据")
-    
-    # 第4步：保存清理后的数据供数据分析使用
-    success = _save_csv_file(cleaned_data, output_file)
-    
-    if success:
-        print(f"数据清理完成！输出文件已保存，可供数据分析使用")
-        return {
-            'success': True,
-            'input_file': input_file,
-            'output_file': output_file,
-            'original_count': len(original_data),
-            'cleaned_count': len(cleaned_data),
-            'removed_count': removed_count
-        }
-    else:
-        return {'success': False, 'error': '保存输出文件失败'}
-
-
-def _read_csv_file(file_path):
-    """内部函数：读取CSV文件"""
-    try:
-        data = []
-        with open(file_path, 'r', encoding='utf-8-sig') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                data.append(row)
-        return data
-    except Exception as e:
-        print(f"读取文件出错: {e}")
-        return []
-
-
-def _clean_single_row(row):
-    """内部函数：清理单行数据"""
-    return {
-        'appid': str(row.get('appid', '')).strip(),
-        'title': _clean_title(row.get('title', '')),
-        'released': _clean_date(row.get('released', '')),
-        'current_price': _clean_price(row.get('current_price', '')),
-        'original_price': _clean_price(row.get('original_price', '')),
-        'tags': _clean_tags(row.get('tags', ''))
-    }
-
-
-def _clean_title(title):
-    """内部函数：清理游戏标题"""
+def clean_title(title):
     if not title:
         return ""
     
+    # 转为字符串并去除首尾空格
     title = str(title).strip()
-    title = re.sub(r'\s+', ' ', title)  # 去除多余空格
-    title = re.sub(r'[™®©]', '', title)  # 去除商标符号
-    title = re.sub(r'<[^>]+>', '', title)  # 去除HTML标签
+    # 把所有多余的空格都变成一个空格
+    title = re.sub(r'\s+', ' ', title)
+    # 删除商标符号
+    title = re.sub(r'[™®©]', '', title)
     
     return title
 
 
-def _clean_price(price_str):
-    """内部函数：清理价格"""
+def clean_price(price_str):
+    if not price_str:  
+        return 0.0
+    
+    # 转为字符串并去除空格
+    price_str = str(price_str).strip()
+    
     if not price_str:
         return 0.0
     
-    price_str = str(price_str).strip().lower()
-    
-    # 处理免费游戏
-    if price_str in ['free', 'free to play', '免费', '0']:
-        return 0.0
-    
-    # 提取数字
+    # 直接提取数字（包括小数）
     numbers = re.findall(r'\d+\.?\d*', price_str)
+    
+    # 如果找到数字，返回第一个（因为每格只有一个价格）
     if numbers:
-        try:
-            return float(numbers[-1])
-        except:
-            return 0.0
+        return float(numbers[0])
     
     return 0.0
 
 
-def _clean_date(date_str):
-    """内部函数：清理发布日期"""
+def clean_date(date_str):
+   
     if not date_str:
         return ""
-    
-    date_str = str(date_str).strip()
-    
-    # 处理未发布的游戏
-    if any(word in date_str.lower() for word in ['coming soon', '即将推出', 'tba']):
-        return "未发布"
-    
-    return date_str
+    return str(date_str).strip()
 
 
-def _clean_tags(tags_str):
-    """内部函数：清理游戏标签"""
+def clean_tags(tags_str):
+    
     if not tags_str:
         return ""
     
-    # 分割并清理标签
-    tags = [tag.strip() for tag in str(tags_str).split(',')]
-    tags = [tag for tag in tags if tag and len(tag) <= 30]  # 去除空标签和过长标签
+    tags_str = str(tags_str).strip()
     
-    # 去重并限制数量
+    # 把其他可能的分隔符替换为英文逗号
+    tags_str = tags_str.replace('，', ',').replace('、', ',')
+    tags_str = tags_str.replace('|', ',').replace(';', ',')
+    
+    # 分割并清理每个标签
+    tags = []
+    for tag in tags_str.split(','):
+        tag = tag.strip()
+        if tag:  
+            tags.append(tag)
+    
+    # 去重
     unique_tags = []
     for tag in tags:
         if tag not in unique_tags:
             unique_tags.append(tag)
     
-    return ", ".join(unique_tags[:10])  # 最多保留10个标签
+    # 用英文逗号和空格连接
+    return ", ".join(unique_tags)
 
 
-def _is_valid_row(row):
-    """内部函数：验证数据行是否有效"""
-    # 检查必要字段
+def is_valid(row):
+ 
     if not row['appid'] or not row['appid'].isdigit():
         return False
     
+    # title 不能为空
     if not row['title']:
         return False
     
     return True
 
 
-def _remove_duplicates(data_list):
-    """内部函数：去除重复数据"""
+def clean_data():
+  
+    print("=" * 60)
+    print("Steam游戏数据清理工具")
+    print("=" * 60)
+    
+    # ========== 步骤1：读取原始数据 ==========
+    print(f"\n[1/4] 读取文件: {INPUT_FILE}")
+    try:
+        with open(INPUT_FILE, 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            raw_data = list(reader)
+    except FileNotFoundError:
+        print(f"错误：找不到文件 {INPUT_FILE}")
+        print("请确保文件在正确的位置！")
+        return
+    except Exception as e:
+        print(f"错误：读取文件失败 - {e}")
+        return
+    
+    print(f"   原始数据: {len(raw_data)} 条")
+    
+    # ========== 步骤2：清理数据 ==========
+    print(f"\n[2/4] 清理数据...")
+    cleaned_data = []
+    removed = 0
+    
+    for row in raw_data:
+        # 清理每个字段
+        clean_row = {
+            'appid': str(row.get('appid', '')).strip(),
+            'title': clean_title(row.get('title', '')),
+            'released': clean_date(row.get('released', '')),
+            'current_price': clean_price(row.get('current_price', '')),
+            'original_price': clean_price(row.get('original_price', '')),
+            'tags': clean_tags(row.get('tags', ''))
+        }
+        
+        # 验证是否有效
+        if is_valid(clean_row):
+            cleaned_data.append(clean_row)
+        else:
+            removed += 1
+    
+    print(f"   有效数据: {len(cleaned_data)} 条")
+    print(f"   移除无效: {removed} 条")
+    
+    # ========== 步骤3：去除重复 ==========
+    print(f"\n[3/4] 去除重复数据...")
     seen_appids = set()
     unique_data = []
     
-    for row in data_list:
+    for row in cleaned_data:
         appid = row['appid']
         if appid not in seen_appids:
             seen_appids.add(appid)
             unique_data.append(row)
     
-    return unique_data
-
-
-def _save_csv_file(data, output_file):
-    """内部函数：保存CSV文件"""
+    duplicates = len(cleaned_data) - len(unique_data)
+    print(f"   去重后: {len(unique_data)} 条")
+    print(f"   移除重复: {duplicates} 条")
+    
+    # ========== 步骤4：保存结果 ==========
+    print(f"\n[4/4] 保存文件: {OUTPUT_FILE}")
     try:
-        # 确保输出目录存在
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
-        
-        with open(output_file, 'w', newline='', encoding='utf-8-sig') as f:
-            if data:
-                fieldnames = ['appid', 'title', 'released', 'current_price', 'original_price', 'tags']
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                writer.writeheader()
-                writer.writerows(data)
-        
-        print(f"数据已保存到: {output_file}")
-        return True
-        
-    except Exception as e:
-        print(f"保存文件出错: {e}")
-        return False
-
-# 测试代码（仅在直接运行此文件时执行）
-if __name__ == "__main__":
-    # 测试数据清理功能
-    print("=== 测试数据清理功能 ===")
-    
-    # 模拟从steam_data_extractor获取的文件路径
-    input_file = "../data/steam_topsellers_simple.csv"  # 原始数据文件
-    output_file = "../data/steam_games_cleaned1.csv"  # 清理后的数据文件
-    
-    # 如果测试文件不存在，创建测试数据
-    if not os.path.exists(input_file):
-        print("创建测试数据文件...")
-        os.makedirs(os.path.dirname(input_file), exist_ok=True)
-        
-        # 创建测试CSV文件
-        import csv
-        test_data = [
-            {'appid': '570', 'title': 'Dota 2™', 'released': '2013-07-09', 'current_price': 'Free', 'original_price': 'Free', 'tags': 'MOBA,Free to Play,Multiplayer'},
-            {'appid': '730', 'title': 'Counter-Strike 2   ', 'released': '2023-09-27', 'current_price': '0', 'original_price': '0', 'tags': 'FPS,Multiplayer,Competitive'},
-            {'appid': '', 'title': '', 'released': '', 'current_price': '', 'original_price': '', 'tags': ''},  # 无效数据
-            {'appid': '570', 'title': 'Dota 2', 'released': '2013-07-09', 'current_price': 'Free', 'original_price': 'Free', 'tags': 'MOBA,Free to Play'}  # 重复数据
-        ]
-        
-        with open(input_file, 'w', newline='', encoding='utf-8-sig') as f:
-            fieldnames = ['appid', 'title', 'released', 'current_price', 'original_price', 'tags']
+        with open(OUTPUT_FILE, 'w', newline='', encoding='utf-8-sig') as f:
+            # 定义列顺序（与原始数据一致）
+            fieldnames = ['appid', 'title', 'released', 'current_price', 
+                         'original_price', 'tags']
+            
             writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(test_data)
-        print(f"测试数据已保存到: {input_file}")
+            writer.writeheader()  # 写入表头
+            writer.writerows(unique_data)  # 写入所有数据
+        
+        print(f"   ✓ 保存成功！")
+    except Exception as e:
+        print(f"   错误：保存失败 - {e}")
+        return
     
-    # 执行数据清理
-    result = clean_steam_data_auto(input_file, output_file)
-    print("测试结果:", result)
+    # ========== 显示统计信息 ==========
+    print("\n" + "=" * 60)
+    print("清理完成！统计信息：")
+    print("=" * 60)
+    print(f"原始记录数：{len(raw_data)}")
+    print(f"有效记录数：{len(unique_data)}")
+    print(f"无效记录数：{removed}")
+    print(f"重复记录数：{duplicates}")
+    print(f"最终保留：{len(unique_data)} 条")
+    print("=" * 60)
+
+
+# 程序入口
+if __name__ == "__main__":
+    clean_data()
