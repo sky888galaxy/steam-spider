@@ -221,8 +221,8 @@ if __name__ == "__main__":
     print("=== 测试数据清理功能 ===")
     
     # 模拟从steam_data_extractor获取的文件路径
-    input_file = "../data/steam_games_raw.csv"  # 原始数据文件
-    output_file = "../data/steam_games_cleaned.csv"  # 清理后的数据文件
+    input_file = "../data/steam_topsellers_simple.csv"  # 原始数据文件
+    output_file = "../data/steam_games_cleaned1.csv"  # 清理后的数据文件
     
     # 如果测试文件不存在，创建测试数据
     if not os.path.exists(input_file):
