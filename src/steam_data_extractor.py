@@ -184,7 +184,7 @@ def main():
 
         # 价格：优先 API（结构化），失败回退到搜索页文本解析
         if appid:
-            price_info = get_price_from_api(appid, cc="CN", lang="schinese")
+            price_info = get_price_from_api(appid, cc="US", lang="en")
             if price_info and price_info.get("final") is not None:
                 record["current_price"] = str(price_info.get("final"))
                 record["original_price"] = str(price_info.get("initial")) if price_info.get("initial") is not None else ""

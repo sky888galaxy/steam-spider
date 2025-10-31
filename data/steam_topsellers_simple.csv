@@ -1,11 +1,26 @@
-appid,title,released,current_price,original_price,tags
-730,"Counter-Strike 2",2023年9月27日,0,0,"Action, FPS, Multiplayer, Competitive, Shooter"
-570,"Dota 2   ",2013年7月9日,Free,,"Action, Free to Play, MOBA, Multiplayer, Strategy"
-1086940,"Baldur's Gate 3™",2023年8月3日,298.00,398.00,"RPG, Story Rich, Choices Matter, Character Customization, Fantasy"
-1245620,"ELDEN RING",2022年2月25日,298,398,"Action RPG, Souls-like, Dark Fantasy, Difficult, Exploration"
-381210,"Dead by Daylight",2016年6月14日,68.00,98.00,"Horror, Multiplayer, Survival Horror, Online Co-Op, Asymmetric VR"
-271590,"Grand Theft Auto V",2015年4月14日,,"¥ 199.00","Action, Adventure, Open World, Crime, Multiplayer"
-1174180,"Red Dead Redemption 2",2019年12月5日,198.00,298.00,"Adventure, Action, Open World, Western, Story Rich"
-,Apex Legends™,2020年11月4日,Free,,"Action, Free to Play, Battle Royale, FPS, Multiplayer"
-578080,"PUBG: BATTLEGROUNDS",2017年12月21日,免费,98.00,"Action, Battle Royale, Survival, Multiplayer, Shooter"
-427520,"Factorio   ",2020年8月14日,105.00,,"Automation, Strategy, Building, Indie, Simulation, Automation, Strategy"
+﻿appid,title,released,current_price,original_price,tags
+3167020,Escape From Duckov,"16 Oct, 2025",15.83,17.99,"Adventure, Action, Looter Shooter, Shooter, Third-Person Shooter, Top-Down Shooter, Exploration, Extraction Shooter, Survival, Base Building, Cute, Cartoon, Top-Down, Gun Customization, Funny, Action-Adventure, RPG, Roguelite, Action Roguelike, Indie"
+730,Counter-Strike 2,"21 Aug, 2012",,,"FPS, Shooter, Multiplayer, Competitive, Action, Team-Based, eSports, Tactical, First-Person, PvP, Online Co-Op, Co-op, Strategy, Military, War, Difficult, Trading, Realistic, Fast-Paced, Moddable"
+2807960,Battlefield™ 6,"10 Oct, 2025",69.99,69.99,"Multiplayer, Action, FPS, Military, War, Singleplayer, Shooter, Modern, Epic, Realistic, Combat, Tactical, Destruction, Battle Royale, Atmospheric, Violent, PvP, Co-op, Sandbox, Dating Sim"
+578080,PUBG: BATTLEGROUNDS,"21 Dec, 2017",,,"Survival, Shooter, Battle Royale, Multiplayer, FPS, PvP, Third-Person Shooter, Action, Online Co-Op, Tactical, Co-op, First-Person, Strategy, Early Access, Competitive, Third Person, Team-Based, Difficult, Simulation, Stealth"
+990080,Hogwarts Legacy,"10 Feb, 2023",8.99,59.99,"Magic, Open World, Fantasy, Singleplayer, Adventure, RPG, Character Customization, Exploration, Story Rich, Third Person, Action-Adventure, Atmospheric, Action RPG, Action, Combat, Choices Matter, Puzzle, Great Soundtrack, Dark, Family Friendly"
+2627260,NINJA GAIDEN 4,"20 Oct, 2025",69.99,69.99,"Action, Adventure, Hack and Slash, Ninja, Action-Adventure, Violent, Gore, 3D, Singleplayer, Spectacle fighter, Character Action Game, Difficult, Third Person"
+2507950,Delta Force,"4 Dec, 2024",,,"Free to Play, FPS, Multiplayer, Extraction Shooter, Singleplayer, Co-op, Shooter, Massively Multiplayer, PvP, Action, PvE, First-Person, Looter Shooter, Online Co-Op, Tactical, Gun Customization, Hero Shooter, Military, Co-op Campaign, Team-Based"
+1222140,Detroit: Become Human,"18 Jun, 2020",7.99,39.99,
+1174180,Red Dead Redemption 2,"5 Dec, 2019",14.99,59.99,"Open World, Story Rich, Western, Multiplayer, Adventure, Action, Realistic, Singleplayer, Shooter, Horses, Beautiful, Atmospheric, Mature, Third-Person Shooter, Great Soundtrack, Third Person, Gore, Sandbox, First-Person, FPS"
+1172470,Apex Legends™,"4 Nov, 2020",,,"Free to Play, Multiplayer, Battle Royale, FPS, Shooter, First-Person, PvP, Action, Hero Shooter, Team-Based, Tactical, Sci-fi, Loot, Survival, Co-op, Character Customization, Funny, Lore-Rich, Cyberpunk, Cinematic"
+3240220,Grand Theft Auto V Enhanced,"4 Mar, 2025",14.99,29.99,
+3405690,EA SPORTS FC™ 26,"25 Sep, 2025",69.99,69.99,"Football (Soccer), Sports, Simulation, Multiplayer, Singleplayer, Competitive, Realistic, Online Co-Op, Controller, Local Co-Op, PvP, Local Multiplayer, Family Friendly, eSports, Modern, Open World, LGBTQ+, Co-op"
+431960,Wallpaper Engine,"16 Nov, 2018",4.99,4.99,"Mature, Utilities, Anime, Software, Design & Illustration, Animation & Modeling, First-Person, NSFW, Indie, Memes, Cute, Action, Singleplayer, Funny, Early Access, Photo Editing, Sandbox, Gaming, Horror, Game Development"
+3472040,NBA 2K26,"4 Sep, 2025",48.99,69.99,"Gambling, Sports, Simulation, Basketball, eSports, 3D, PvP, Management, Singleplayer, Character Customization, Multiplayer, Controller, Team-Based, Immersive Sim, Online Co-Op, Trading, Co-op, Local Multiplayer, Sexual Content, Local Co-Op"
+1984270,Digimon Story Time Stranger,"2 Oct, 2025",69.99,69.99,"RPG, JRPG, Creature Collector, Party-Based RPG, Anime, Collectathon, 3D, Cute, Time Travel, Fantasy, Pixel Graphics, Emotional, Alternate History, Turn-Based Combat, Modern, Mythology, Character Customization, Singleplayer, Story Rich, Team-Based"
+1973530,Limbus Company,"26 Feb, 2023",,,"Lore-Rich, Story Rich, Free to Play, Turn-Based Combat, Turn-Based Tactics, Visual Novel, RPG, Singleplayer, Strategy, Strategy RPG, Anime, Great Soundtrack, Turn-Based Strategy, PvE, Dark Fantasy, 2D, Action, Sci-fi, Roguelite, Colorful"
+1364780,Street Fighter™ 6,"1 Jun, 2023",39.99,39.99,"2D Fighter, Fighting, Arcade, Character Customization, Multiplayer, Action, Competitive, PvP, Adventure, Singleplayer, eSports, Local Multiplayer, Open World, Controller, Martial Arts, 3D, Action RPG, Great Soundtrack, Mature, Anime"
+230410,Warframe,"25 Mar, 2013",,,
+1203220,NARAKA: BLADEPOINT,"11 Aug, 2021",,,"Battle Royale, Multiplayer, Martial Arts, Mature, PvP, Action, Female Protagonist, Character Customization, Fighting, Massively Multiplayer, Survival, Third Person, Swordplay, Hack and Slash, Anime, Parkour, Adventure, Free to Play, Violent, Gore"
+2358720,Black Myth: Wukong,"19 Aug, 2024",59.99,59.99,
+2062430,BALL x PIT,"15 Oct, 2025",14.99,14.99,"Action, Arcade, Roguelike, Bullet Hell, Action Roguelike, Roguelite, Shoot 'Em Up, Top-Down Shooter, 2D, Pixel Graphics, Top-Down, Building, Crafting, Base Building, Combat, Singleplayer, Controller, Indie, RPG"
+1169040,Necesse,"16 Oct, 2025",7.49,14.99,"Open World Survival Craft, Multiplayer, Open World, Pixel Graphics, Sandbox, Adventure, Survival, Indie, Crafting, RPG, Co-op, Building, Action, Early Access, Exploration, Online Co-Op, Base Building, 2D, Automation, Atmospheric"
+413150,Stardew Valley,"26 Feb, 2016",14.99,14.99,"Farming Sim, Pixel Graphics, Multiplayer, Life Sim, RPG, Relaxing, Agriculture, Simulation, Crafting, Indie, Sandbox, Building, Casual, Open World, Singleplayer, 2D, Dating Sim, Cute, Great Soundtrack, Fishing"
+570,Dota 2,"9 Jul, 2013",,,"Free to Play, MOBA, Multiplayer, Strategy, eSports, Team-Based, Competitive, Action, Online Co-Op, PvP, Difficult, Co-op, RTS, RPG, Tower Defense, Fantasy, Character Customization, Replay Value, Action RPG, Simulation"
+3551340,Football Manager 26,"4 Nov, 2025",53.99,59.99,"Simulation, Strategy, Sports, Football (Soccer), Multiplayer, Singleplayer, Management"

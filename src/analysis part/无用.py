@@ -2,7 +2,7 @@ import csv
 #简单处理
 #给清理后的数据挨个加上排名以及折扣率
 def primary_process(input_file):
-    output_file = "data/analysis_use.csv"
+    output_file = "../data/analysis_use.csv"
     with open(input_file, 'r',encoding="utf-8") as uncleaned, \
             open(output_file, 'w',encoding="utf-8") as cleaned:
         reader = csv.reader(uncleaned)
@@ -21,4 +21,4 @@ def primary_process(input_file):
 
 # 测试用
 if __name__ == '__main__':
-    primary_process('steam_topsellers_simple_cleaned.csv')
+    primary_process('../data/steam_games_cleaned1.csv')
