@@ -63,10 +63,16 @@ def show_pictures(input_file,tag):
     mpl.show()
 
 import csv
+import os
+from pathlib import Path
+
+# 使用绝对路径
+BASE_DIR = Path(__file__).parent.parent.parent
+
 #简单处理
 #给清理后的数据挨个加上排名以及折扣率
 def primary_process(input_file):
-    output_file = "analysis_use.csv"
+    output_file = str(BASE_DIR / "src" / "analysis part" / "analysis_use.csv")
     with open(input_file, 'r',encoding="utf-8") as uncleaned, \
             open(output_file, 'w',encoding="utf-8") as cleaned:
         reader = csv.reader(uncleaned)
@@ -84,5 +90,8 @@ def primary_process(input_file):
             writer.writerow(newrow)
 #测试用的
 if __name__ == '__main__':
-    primary_process('../data/steam_topsellers_simple_cleaned.csv')
-    show_pictures('analysis_use.csv',["Action"])
+    cleaned_csv = BASE_DIR / "data" / "steam_topsellers_simple_cleaned.csv"
+    analysis_csv = BASE_DIR / "src" / "analysis part" / "analysis_use.csv"
+    
+    primary_process(str(cleaned_csv))
+    show_pictures(str(analysis_csv), ["Action"])
