@@ -118,6 +118,40 @@ def get_tags_from_app_page(appid: str) -> str:
     except Exception:
         return ""
 
+def get_extra_game_info(appid: str) -> dict:
+    """
+    简单函数：从游戏页面获取额外信息（发售日期、评分等）
+    返回: {'release_date': '发售日期', 'review_score': '评分', 'developer': '开发商'}
+    """
+    try:
+        url = APP_URL.format(appid=appid)
+        r = session.get(url, params={"l":"english"}, timeout=(8,20))
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
+        
+        info = {'release_date': '', 'review_score': '', 'developer': ''}
+        
+        # 获取发售日期 (更准确的格式)
+        release_elem = soup.select_one("div.release_date .date")
+        if release_elem:
+            info['release_date'] = release_elem.get_text(strip=True)
+        
+        # 获取评分信息
+        review_elem = soup.select_one("div.user_reviews_summary_row .game_review_summary")
+        if review_elem:
+            # 获取评分描述（如 "Very Positive"）
+            review_text = review_elem.get_text(strip=True)
+            info['review_score'] = review_text
+        
+        # 获取开发商
+        dev_elem = soup.select_one("div.dev_row .summary.column a")
+        if dev_elem:
+            info['developer'] = dev_elem.get_text(strip=True)
+        
+        return info
+    except Exception:
+        return {'release_date': '', 'review_score': '', 'developer': ''}
+
 def merge_tags(search_tags: str, page_tags: str) -> str:
     seen = []
     for t in (search_tags or "").split(","):
@@ -149,7 +183,7 @@ def price_fallback_from_text(price_text: str):
     return (current, original)
 
 def save_csv(rows, filename="../data/steam_topsellers_simple.csv"):
-    keys = ["appid","title","released","current_price","original_price","tags"]
+    keys = ["appid","title","released","current_price","original_price","tags","release_date","review_score","developer"]
     with open(filename, "w", newline='', encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=keys)
         writer.writeheader()
@@ -160,19 +194,23 @@ def save_csv(rows, filename="../data/steam_topsellers_simple.csv"):
                 "released": r.get("released",""),
                 "current_price": r.get("current_price",""),
                 "original_price": r.get("original_price",""),
-                "tags": r.get("tags","")
+                "tags": r.get("tags",""),
+                "release_date": r.get("release_date",""),
+                "review_score": r.get("review_score",""),
+                "developer": r.get("developer","")
             })
 
 def main():
     print("当前 Python 解释器：", sys.executable)
-    pages_to_scrape = 1   # 默认抓第一页，改成 N 抓更多页
+    pages_to_scrape = 3   # 增加到3页，获取更多数据（约75个游戏）
     all_items = []
     for p in range(1, pages_to_scrape+1):
         print(f"抓取搜索页 page {p} ...")
         html = fetch_search_page(page=p, filter_name="topsellers")
         items = parse_search_html(html)
         all_items.extend(items)
-        time.sleep(1.0)
+        print(f"  第{p}页获取到 {len(items)} 个游戏")
+        time.sleep(0.8)  # 稍微降低延迟以提高效率
 
     out = []
     for i, it in enumerate(all_items, 1):
@@ -180,7 +218,8 @@ def main():
         title = it.get("title","")
         print(f"[{i}/{len(all_items)}] {title[:60]}  (appid={appid})")
         record = {"appid": appid, "title": title, "released": it.get("released",""),
-                  "current_price": "", "original_price": "", "tags": ""}
+                  "current_price": "", "original_price": "", "tags": "",
+                  "release_date": "", "review_score": "", "developer": ""}
 
         # 价格：优先 API（结构化），失败回退到搜索页文本解析
         if appid:
@@ -192,6 +231,13 @@ def main():
                 cur, orig = price_fallback_from_text(it.get("price_text",""))
                 record["current_price"] = cur
                 record["original_price"] = orig
+            
+            # 获取额外信息（发售日期、评分、开发商）
+            extra_info = get_extra_game_info(appid)
+            record["release_date"] = extra_info.get("release_date", "")
+            record["review_score"] = extra_info.get("review_score", "")
+            record["developer"] = extra_info.get("developer", "")
+            
             # 标签：优先详情页的完整标签，若为空用搜索页标签
             tags_page = get_tags_from_app_page(appid)
             merged = merge_tags(it.get("tags_text",""), tags_page)
@@ -204,7 +250,7 @@ def main():
             record["tags"] = it.get("tags_text","")
 
         out.append(record)
-        time.sleep(1.0)  # 礼貌延迟
+        time.sleep(0.7)  # 降低延迟提高效率，但保持礼貌
 
     save_csv(out)
     print(f"完成，保存 {len(out)} 条到 ../data/steam_topsellers_simple.csv")

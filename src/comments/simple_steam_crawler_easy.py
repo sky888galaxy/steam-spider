@@ -58,7 +58,7 @@ def fetch_reviews(app_id, max_reviews=30):
     参数: 
         app_id - Steam游戏ID
         max_reviews - 最多爬取评论数
-    返回: 评论列表 [{'content': '评论文本', 'page': 页码}, ...]
+    返回: 评论列表 [{'content': '评论文本', 'page': 页码, 'helpful': 有用数, 'language': 语言}, ...]
     """
     reviews = []
     url = f"https://steamcommunity.com/app/{app_id}/reviews/"
@@ -72,16 +72,49 @@ def fetch_reviews(app_id, max_reviews=30):
                 break
             
             soup = BeautifulSoup(r.content, 'html.parser')
-            elems = soup.select('div.apphub_CardTextContent')
-            if not elems:
+            review_containers = soup.select('div.apphub_Card')
+            if not review_containers:
                 break
             
-            for e in elems:
+            for container in review_containers:
                 if len(reviews) >= max_reviews:
                     break
-                text = e.get_text(strip=True)
-                if text:
-                    reviews.append({'content': text, 'page': page})
+                
+                # 获取评论文本
+                content_elem = container.select_one('div.apphub_CardTextContent')
+                if not content_elem:
+                    continue
+                    
+                text = content_elem.get_text(strip=True)
+                if not text:
+                    continue
+                
+                # 获取有用数（简单提取数字）
+                helpful = 0
+                helpful_elem = container.select_one('div.found_helpful')
+                if helpful_elem:
+                    helpful_text = helpful_elem.get_text()
+                    import re
+                    numbers = re.findall(r'\d+', helpful_text)
+                    if numbers:
+                        helpful = int(numbers[0])
+                
+                # 检测语言（简单判断）
+                language = 'unknown'
+                if any(ord(char) > 127 for char in text[:100]):  # 包含非ASCII字符
+                    if any('\u4e00' <= char <= '\u9fff' for char in text[:100]):  # 中文字符
+                        language = 'chinese'
+                    else:
+                        language = 'other'
+                else:
+                    language = 'english'
+                
+                reviews.append({
+                    'content': text, 
+                    'page': page,
+                    'helpful': helpful,
+                    'language': language
+                })
             
             page += 1
             time.sleep(1.5)
@@ -113,6 +146,8 @@ def analyze_game_threats(app_id, game_title, max_reviews=30):
             'contacts': 联系方式数
         },
         'threat_rate': 威胁比例,
+        'language_stats': {'chinese': 数量, 'english': 数量, 'other': 数量},
+        'avg_helpful': 平均有用数,
         'details': [前5条可疑评论详情]
     }
     """
@@ -123,6 +158,8 @@ def analyze_game_threats(app_id, game_title, max_reviews=30):
     
     # 2. 威胁检测与统计
     threat_stats = {'links': 0, 'keywords': 0, 'contacts': 0}
+    language_stats = {'chinese': 0, 'english': 0, 'other': 0, 'unknown': 0}
+    total_helpful = 0
     suspicious_reviews = []
     
     for i, review in enumerate(reviews):
@@ -132,12 +169,24 @@ def analyze_game_threats(app_id, game_title, max_reviews=30):
         for key in threat_stats:
             threat_stats[key] += threats[key]
         
+        # 语言统计
+        lang = review.get('language', 'unknown')
+        if lang in language_stats:
+            language_stats[lang] += 1
+        else:
+            language_stats['unknown'] += 1
+        
+        # 有用数统计
+        total_helpful += review.get('helpful', 0)
+        
         # 记录可疑评论
         if threats['links'] or threats['keywords'] or threats['contacts']:
             suspicious_reviews.append({
                 'index': i + 1,
                 'content': review['content'][:100] + '...' if len(review['content']) > 100 else review['content'],
                 'page': review['page'],
+                'helpful': review.get('helpful', 0),
+                'language': review.get('language', 'unknown'),
                 'threats': threats
             })
     
@@ -149,6 +198,8 @@ def analyze_game_threats(app_id, game_title, max_reviews=30):
         'suspicious_reviews': len(suspicious_reviews),
         'threat_stats': threat_stats,
         'threat_rate': len(suspicious_reviews) / len(reviews) if reviews else 0,
+        'language_stats': language_stats,
+        'avg_helpful': total_helpful / len(reviews) if reviews else 0,
         'details': suspicious_reviews[:5]  # 只返回前5条详情
     }
 

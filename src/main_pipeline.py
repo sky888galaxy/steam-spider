@@ -17,7 +17,7 @@ DATA_DIR = BASE_DIR / "data"
 sys.path.insert(0, str(BASE_DIR / "src"))
 
 # 导入各模块
-from steam_data_extractor import fetch_search_page, parse_search_html, get_price_from_api, get_tags_from_app_page, merge_tags, price_fallback_from_text, save_csv
+from steam_data_extractor import fetch_search_page, parse_search_html, get_price_from_api, get_tags_from_app_page, get_extra_game_info, merge_tags, price_fallback_from_text, save_csv
 from clean.data_cleaner import clean_data
 from comments.simple_steam_crawler_easy import analyze_game_threats, print_analysis_result
 
@@ -29,6 +29,7 @@ class SteamAnalysisPipeline:
         self.raw_csv = DATA_DIR / "steam_topsellers_simple.csv"
         self.cleaned_csv = DATA_DIR / "steam_topsellers_simple_cleaned.csv"
         self.comment_analysis_csv = DATA_DIR / "comment_analysis_results.csv"
+        self.suspicious_reviews_csv = DATA_DIR / "suspicious_reviews_details.csv"
         self.games_data = []  # 存储游戏数据，用于传递参数
         
     def step1_extract_games(self, pages=1):
@@ -57,7 +58,10 @@ class SteamAnalysisPipeline:
                 "released": it.get("released", ""),
                 "current_price": "",
                 "original_price": "",
-                "tags": ""
+                "tags": "",
+                "release_date": "",
+                "review_score": "",
+                "developer": ""
             }
             
             # 获取价格和标签
@@ -70,6 +74,12 @@ class SteamAnalysisPipeline:
                     cur, orig = price_fallback_from_text(it.get("price_text", ""))
                     record["current_price"] = cur
                     record["original_price"] = orig
+                
+                # 获取额外信息
+                extra_info = get_extra_game_info(appid)
+                record["release_date"] = extra_info.get("release_date", "")
+                record["review_score"] = extra_info.get("review_score", "")
+                record["developer"] = extra_info.get("developer", "")
                 
                 tags_page = get_tags_from_app_page(appid)
                 merged = merge_tags(it.get("tags_text", ""), tags_page)
@@ -150,9 +160,11 @@ class SteamAnalysisPipeline:
         
         # 保存结果
         if results:
+            # 保存汇总结果
             with open(self.comment_analysis_csv, 'w', newline='', encoding='utf-8-sig') as f:
                 fieldnames = ['appid', 'title', 'total_reviews', 'suspicious_reviews',
-                             'threat_rate', 'links', 'keywords', 'contacts']
+                             'threat_rate', 'links', 'keywords', 'contacts', 'avg_helpful',
+                             'chinese_reviews', 'english_reviews']
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
                 
@@ -165,10 +177,46 @@ class SteamAnalysisPipeline:
                         'threat_rate': f"{r['threat_rate']*100:.2f}%",
                         'links': r['threat_stats']['links'],
                         'keywords': r['threat_stats']['keywords'],
-                        'contacts': r['threat_stats']['contacts']
+                        'contacts': r['threat_stats']['contacts'],
+                        'avg_helpful': f"{r.get('avg_helpful', 0):.1f}",
+                        'chinese_reviews': r.get('language_stats', {}).get('chinese', 0),
+                        'english_reviews': r.get('language_stats', {}).get('english', 0)
                     })
             
             print(f"\n✓ 完成：评论分析结果保存到 {self.comment_analysis_csv.name}")
+            
+            # 保存可疑评论详情
+            suspicious_details = []
+            for r in results:
+                if 'details' in r and r['details']:
+                    for detail in r['details']:
+                        suspicious_details.append({
+                            'appid': r['appid'],
+                            'game_title': r['title'],
+                            'review_index': detail['index'],
+                            'review_content': detail['content'],
+                            'page': detail['page'],
+                            'helpful': detail['helpful'],
+                            'language': detail['language'],
+                            'has_links': '是' if detail['threats']['links'] > 0 else '否',
+                            'has_keywords': '是' if detail['threats']['keywords'] > 0 else '否',
+                            'has_contacts': '是' if detail['threats']['contacts'] > 0 else '否',
+                            'link_count': detail['threats']['links'],
+                            'keyword_count': detail['threats']['keywords'],
+                            'contact_count': detail['threats']['contacts']
+                        })
+            
+            if suspicious_details:
+                with open(self.suspicious_reviews_csv, 'w', newline='', encoding='utf-8-sig') as f:
+                    fieldnames = ['appid', 'game_title', 'review_index', 'review_content', 'page',
+                                 'helpful', 'language', 'has_links', 'has_keywords', 'has_contacts',
+                                 'link_count', 'keyword_count', 'contact_count']
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(suspicious_details)
+                
+                print(f"✓ 完成：可疑评论详情保存到 {self.suspicious_reviews_csv.name}")
+                print(f"  共记录 {len(suspicious_details)} 条可疑评论")
         
         return results
     
@@ -178,33 +226,28 @@ class SteamAnalysisPipeline:
         print("【步骤 4/4】数据分析与可视化")
         print("="*60)
         
+        if not show_plots:
+            print(f"✓ 完成：跳过图表显示")
+            return
+        
         # 使用sys.path添加analysis part路径
         analysis_dir = BASE_DIR / "src" / "analysis part"
         if str(analysis_dir) not in sys.path:
             sys.path.insert(0, str(analysis_dir))
         
-        import data_analysis
-        from data_analysis import primary_process, show_pictures
-        
-        # 生成分析用数据（添加rank和discount列）
-        analysis_file_path = BASE_DIR / "src" / "analysis_part" / "analysis_use.csv"
-        print(f"生成分析用数据文件...")
-        primary_process(str(self.cleaned_csv))
-        
-        if show_plots:
-            print(f"生成可视化图表...")
-            try:
-                show_pictures(str(analysis_file_path), ["Action", "Adventure"])
-                print(f"✓ 完成：图表已显示")
-            except Exception as e:
-                print(f"⚠ 可视化出错: {e}")
-        else:
-            print(f"✓ 完成：分析数据已生成（跳过图表显示）")
+        try:
+            from data_analysis import run_analysis
+            run_analysis(str(self.cleaned_csv))
+            print(f"\n✓ 完成：数据分析与可视化")
+        except Exception as e:
+            print(f"⚠ 可视化出错: {e}")
+            import traceback
+            traceback.print_exc()
     
-    def run_full_pipeline(self, pages=1, max_comment_games=5, max_reviews=20, show_plots=True):
+    def run_full_pipeline(self, pages=3, max_comment_games=15, max_reviews=50, show_plots=True):
         """运行完整流水线"""
         print("\n" + "="*70)
-        print("Steam数据分析完整流水线")
+        print("🎮 我超想你steam spider 🕷️")
         print("="*70)
         print(f"配置:")
         print(f"  - 抓取页数: {pages}")
@@ -243,6 +286,10 @@ class SteamAnalysisPipeline:
             print(f"  - {self.raw_csv}")
             print(f"  - {self.cleaned_csv}")
             print(f"  - {self.comment_analysis_csv}")
+            if self.suspicious_reviews_csv.exists():
+                print(f"  - {self.suspicious_reviews_csv}")
+            print("="*70)
+            print("\n🎉 我超想你steam spider 运行完成！🎉")
             print("="*70)
             
             return True
@@ -262,9 +309,9 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='Steam数据分析流水线')
-    parser.add_argument('--pages', type=int, default=1, help='抓取页数 (默认1)')
-    parser.add_argument('--games', type=int, default=5, help='评论分析游戏数 (默认5)')
-    parser.add_argument('--reviews', type=int, default=20, help='每款游戏评论数 (默认20)')
+    parser.add_argument('--pages', type=int, default=3, help='抓取页数 (默认3)')
+    parser.add_argument('--games', type=int, default=15, help='评论分析游戏数 (默认15)')
+    parser.add_argument('--reviews', type=int, default=50, help='每款游戏评论数 (默认50)')
     parser.add_argument('--no-plots', action='store_true', help='不显示图表')
     parser.add_argument('--step', type=str, choices=['1', '2', '3', '4', 'all'], 
                        default='all', help='执行特定步骤 (1-4) 或全部 (all)')
