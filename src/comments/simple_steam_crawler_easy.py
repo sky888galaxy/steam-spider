@@ -234,28 +234,6 @@ def print_analysis_result(result):
     print("=" * 60)
 
 
-def main():
-    """
-    独立运行示例
-    演示如何使用本模块分析单款游戏
-    """
-    print("Steam评论威胁分析模块 (课设版)")
-    print("=" * 60)
-    
-    # 示例：分析Counter-Strike 2
-    print("\n示例：分析 Counter-Strike 2")
-    app_id = input("请输入游戏ID (默认730): ").strip() or "730"
-    title = input("请输入游戏名 (默认Counter-Strike 2): ").strip() or "Counter-Strike 2"
-    max_reviews = input("分析评论数 (默认30): ").strip()
-    
-    try:
-        max_reviews = int(max_reviews) if max_reviews else 30
-    except ValueError:
-        max_reviews = 30
-    
-    print(f"\n开始分析 {title} (ID: {app_id})...")
-    result = analyze_game_threats(app_id, title, max_reviews)
-    print_analysis_result(result)
 
 
 if __name__ == "__main__":
