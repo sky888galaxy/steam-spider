@@ -1,9 +1,13 @@
 
 import csv
 import re
+import os
+from pathlib import Path
 
-INPUT_FILE = "../data/steam_topsellers_simple1.csv"
-OUTPUT_FILE = "../data/steam_topsellers_simple_cleaned.csv"
+# 使用绝对路径，让模块可以从任意位置调用
+BASE_DIR = Path(__file__).parent.parent.parent
+INPUT_FILE = str(BASE_DIR / "data" / "steam_topsellers_simple.csv")
+OUTPUT_FILE = str(BASE_DIR / "data" / "steam_topsellers_simple_cleaned.csv")
 
 
 def clean_title(title):

@@ -1,19 +1,20 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Steam评论威胁分析模块 - 课设版
+功能：独立的评论爬取与信息安全威胁分析模块
+可被其他程序调用，也可独立运行
+"""
 
 import re
 import requests
 import time
 from bs4 import BeautifulSoup
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-}
+HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
-# 检测规则 
-EXTERNAL_LINKS = [
-    r"https?://[^\s]+",
-    r"www\.[^\s]+\.[a-zA-Z]{2,}"
-]
-
+# 威胁检测规则
+EXTERNAL_LINKS = [r"https?://[^\s]+", r"www\.[^\s]+\.[a-zA-Z]{2,}"]
 SUSPICIOUS_KEYWORDS = [
     "外挂", "挂机", "脚本", "破解", "免费获得", "代挂",
     "hack", "cheat", "bot", "script", "crack",
@@ -22,290 +23,239 @@ SUSPICIOUS_KEYWORDS = [
     "代练", "低价出售", "便宜卖", "代打",
     "加群", "进群", "关注", "私聊", "联系我"
 ]
-
-CONTACT_PATTERNS = [
-    r"1[3-9]\d{9}", 
-    r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}" 
-]
+CONTACT_PATTERNS = [r"1[3-9]\d{9}", r"[\w._%+-]+@[\w.-]+\.[a-zA-Z]{2,}"]
 
 
-def detect_suspicious_content(text):
+def _find_regex(patterns, text, flags=0):
+    """辅助函数：统一处理正则匹配"""
+    found = []
+    for p in patterns:
+        found.extend(re.findall(p, text, flags))
+    return found
 
-    result = {
-        'links': 0,
-        'keywords': 0,
-        'contacts': 0,
-        'found_items': []
+
+def detect_threats(text):
+    """
+    检测文本中的安全威胁
+    参数: text - 评论文本
+    返回: 字典包含威胁统计
+    """
+    text = text or ""
+    links = _find_regex(EXTERNAL_LINKS, text, re.IGNORECASE)
+    contacts = _find_regex(CONTACT_PATTERNS, text)
+    keywords = [k for k in SUSPICIOUS_KEYWORDS if k.lower() in text.lower()]
+    return {
+        'links': len(links),
+        'keywords': len(keywords),
+        'contacts': len(contacts),
+        'found_items': links + contacts + keywords
     }
-    
-    # 检测外部链接
-    for pattern in EXTERNAL_LINKS:
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        if matches:
-            result['links'] += len(matches)
-            result['found_items'].extend(matches)
-    
-    # 检测可疑关键词
-    for keyword in SUSPICIOUS_KEYWORDS:
-        if keyword.lower() in text.lower():
-            result['keywords'] += 1
-            result['found_items'].append(keyword)
-    
-    # 检测联系方式
-    for pattern in CONTACT_PATTERNS:
-        matches = re.findall(pattern, text)
-        if matches:
-            result['contacts'] += len(matches)
-            result['found_items'].extend(matches)
-    
-    return result
 
 
-def search_steam_game(game_name):
-
-    try:
-        print(f"正在搜索游戏: {game_name}")
-        
-        # Steam搜索URL
-        search_url = "https://store.steampowered.com/search/"
-        params = {
-            'term': game_name,
-            'category1': 998, 
-            'l': 'schinese'  
-        }
-        
-        # 发送请求
-        response = requests.get(search_url, params=params, headers=HEADERS, timeout=15)
-        if response.status_code != 200:
-            print(f"搜索请求失败，状态码: {response.status_code}")
-            return None
-        
-        # 解析HTML
-        soup = BeautifulSoup(response.content, 'html.parser')
-        search_results = soup.find_all('a', class_='search_result_row')
-        
-        if not search_results:
-            print("没有找到搜索结果")
-            return None
-        
-        # 获取第一个结果
-        first_result = search_results[0]
-        game_url = first_result.get('href', '')
-        
-        # 提取游戏ID
-        game_id_match = re.search(r'/app/(\d+)/', game_url)
-        if not game_id_match:
-            print("无法提取游戏ID")
-            return None
-        
-        game_id = game_id_match.group(1)
-        
-        # 提取游戏名称
-        title_elem = first_result.find('span', class_='title')
-        game_title = title_elem.text.strip() if title_elem else "未知游戏"
-        
-        return {
-            'id': game_id,
-            'name': game_title
-        }
-        
-    except Exception as e:
-        print(f"搜索游戏时出错: {e}")
-        return None
-
-
-def get_steam_reviews(app_id, max_reviews=30):
-
+def fetch_reviews(app_id, max_reviews=30):
+    """
+    核心功能：根据appid爬取游戏评论
+    参数: 
+        app_id - Steam游戏ID
+        max_reviews - 最多爬取评论数
+    返回: 评论列表 [{'content': '评论文本', 'page': 页码, 'helpful': 有用数, 'language': 语言}, ...]
+    """
     reviews = []
+    url = f"https://steamcommunity.com/app/{app_id}/reviews/"
+    page = 1
     
     try:
-        print(f"开始获取游戏 {app_id} 的评论...")
-        
-        # Steam评论页面URL
-        reviews_url = f"https://steamcommunity.com/app/{app_id}/reviews/"
-        
-        page = 1
-        max_pages = (max_reviews // 10) + 1 
-        
-        while page <= max_pages and len(reviews) < max_reviews:
-            print(f"正在获取第 {page} 页评论...")
-            
-            params = {
-                'browsefilter': 'mostrecent',
-                'filterLanguage': 'schinese',
-                'p': page
-            }
-            
-            response = requests.get(reviews_url, params=params, headers=HEADERS, timeout=15)
-            if response.status_code != 200:
-                print(f"获取评论失败，状态码: {response.status_code}")
+        while len(reviews) < max_reviews:
+            params = {'browsefilter': 'mostrecent', 'filterLanguage': 'schinese', 'p': page}
+            r = requests.get(url, params=params, headers=HEADERS, timeout=15)
+            if r.status_code != 200:
                 break
             
-            soup = BeautifulSoup(response.content, 'html.parser')
-            review_elements = soup.find_all('div', class_='apphub_CardTextContent')
-            
-            if not review_elements:
-                print("没有找到更多评论")
+            soup = BeautifulSoup(r.content, 'html.parser')
+            review_containers = soup.select('div.apphub_Card')
+            if not review_containers:
                 break
             
-            # 提取评论文本
-            for review_elem in review_elements:
+            for container in review_containers:
                 if len(reviews) >= max_reviews:
                     break
                 
-                review_text = review_elem.get_text(strip=True)
-                if review_text:
-                    reviews.append({
-                        'content': review_text,
-                        'page': page
-                    })
+                # 获取评论文本
+                content_elem = container.select_one('div.apphub_CardTextContent')
+                if not content_elem:
+                    continue
+                    
+                text = content_elem.get_text(strip=True)
+                if not text:
+                    continue
+                
+                # 获取有用数（简单提取数字）
+                helpful = 0
+                helpful_elem = container.select_one('div.found_helpful')
+                if helpful_elem:
+                    helpful_text = helpful_elem.get_text()
+                    import re
+                    numbers = re.findall(r'\d+', helpful_text)
+                    if numbers:
+                        helpful = int(numbers[0])
+                
+                # 检测语言（简单判断）
+                language = 'unknown'
+                if any(ord(char) > 127 for char in text[:100]):  # 包含非ASCII字符
+                    if any('\u4e00' <= char <= '\u9fff' for char in text[:100]):  # 中文字符
+                        language = 'chinese'
+                    else:
+                        language = 'other'
+                else:
+                    language = 'english'
+                
+                reviews.append({
+                    'content': text, 
+                    'page': page,
+                    'helpful': helpful,
+                    'language': language
+                })
             
             page += 1
-            time.sleep(2) 
-        
-        print(f"成功获取 {len(reviews)} 条评论")
+            time.sleep(1.5)
         return reviews
-        
     except Exception as e:
-        print(f"获取评论时出错: {e}")
-        return []
+        print(f"抓取评论时出错: {e}")
+        return reviews
 
 
-def analyze_game_reviews(game_name, max_reviews=30):
-
-    print("=" * 50)
-    print(f"开始分析游戏: {game_name}")
-    print("=" * 50)
+def analyze_game_threats(app_id, game_title, max_reviews=30):
+    """
+    主函数：分析单款游戏的评论威胁
+    这是供外部调用的主要接口
     
-    # 第一步：搜索游戏
-    game_info = search_steam_game(game_name)
-    if not game_info:
-        print("无法找到游戏，请检查游戏名称")
-        return None
+    参数:
+        app_id - Steam游戏ID
+        game_title - 游戏名称
+        max_reviews - 最多分析评论数
     
-    print(f"找到游戏: {game_info['name']} (ID: {game_info['id']})")
-    
-    # 第二步：获取评论
-    reviews = get_steam_reviews(game_info['id'], max_reviews)
-    if not reviews:
-        print("无法获取评论")
-        return None
-    
-    # 第三步：分析评论内容
-    print("\n开始分析评论内容...")
-    
-    total_stats = {
-        'links': 0,
-        'keywords': 0,
-        'contacts': 0
+    返回: 字典包含完整的威胁分析结果
+    {
+        'appid': '游戏ID',
+        'title': '游戏名',
+        'total_reviews': 总评论数,
+        'suspicious_reviews': 可疑评论数,
+        'threat_stats': {
+            'links': 外部链接数,
+            'keywords': 可疑关键词数,
+            'contacts': 联系方式数
+        },
+        'threat_rate': 威胁比例,
+        'language_stats': {'chinese': 数量, 'english': 数量, 'other': 数量},
+        'avg_helpful': 平均有用数,
+        'details': [前5条可疑评论详情]
     }
+    """
+    # 1. 爬取评论
+    reviews = fetch_reviews(app_id, max_reviews)
+    if not reviews:
+        return None
     
-    problem_reviews = []
+    # 2. 威胁检测与统计
+    threat_stats = {'links': 0, 'keywords': 0, 'contacts': 0}
+    language_stats = {'chinese': 0, 'english': 0, 'other': 0, 'unknown': 0}
+    total_helpful = 0
+    suspicious_reviews = []
     
     for i, review in enumerate(reviews):
-        content = review['content']
-        detection = detect_suspicious_content(content)
+        threats = detect_threats(review['content'])
         
         # 累计统计
-        total_stats['links'] += detection['links']
-        total_stats['keywords'] += detection['keywords']
-        total_stats['contacts'] += detection['contacts']
+        for key in threat_stats:
+            threat_stats[key] += threats[key]
         
-        # 记录有问题的评论
-        if detection['links'] > 0 or detection['keywords'] > 0 or detection['contacts'] > 0:
-            problem_reviews.append({
+        # 语言统计
+        lang = review.get('language', 'unknown')
+        if lang in language_stats:
+            language_stats[lang] += 1
+        else:
+            language_stats['unknown'] += 1
+        
+        # 有用数统计
+        total_helpful += review.get('helpful', 0)
+        
+        # 记录可疑评论
+        if threats['links'] or threats['keywords'] or threats['contacts']:
+            suspicious_reviews.append({
                 'index': i + 1,
-                'content': content[:100] + '...' if len(content) > 100 else content,
+                'content': review['content'][:100] + '...' if len(review['content']) > 100 else review['content'],
                 'page': review['page'],
-                'issues': detection
+                'helpful': review.get('helpful', 0),
+                'language': review.get('language', 'unknown'),
+                'threats': threats
             })
     
-    # 返回分析结果
+    # 3. 返回分析结果
     return {
-        'game_info': game_info,
+        'appid': app_id,
+        'title': game_title,
         'total_reviews': len(reviews),
-        'stats': total_stats,
-        'problem_reviews': problem_reviews[:5] 
+        'suspicious_reviews': len(suspicious_reviews),
+        'threat_stats': threat_stats,
+        'threat_rate': len(suspicious_reviews) / len(reviews) if reviews else 0,
+        'language_stats': language_stats,
+        'avg_helpful': total_helpful / len(reviews) if reviews else 0,
+        'details': suspicious_reviews[:5]  # 只返回前5条详情
     }
 
 
 def print_analysis_result(result):
-
+    """格式化打印分析结果"""
     if not result:
+        print("无分析结果")
         return
     
-    print("\n" + "=" * 50)
-    print("分析结果")
-    print("=" * 50)
+    print("\n" + "=" * 60)
+    print(f"游戏: {result['title']} (ID: {result['appid']})")
+    print(f"总评论数: {result['total_reviews']}")
+    print(f"可疑评论: {result['suspicious_reviews']} ({result['threat_rate']*100:.2f}%)")
+    print(f"\n威胁统计:")
+    print(f"  外部链接: {result['threat_stats']['links']}")
+    print(f"  可疑关键词: {result['threat_stats']['keywords']}")
+    print(f"  联系方式: {result['threat_stats']['contacts']}")
     
-    print(f"游戏名称: {result['game_info']['name']}")
-    print(f"Steam ID: {result['game_info']['id']}")
-    print(f"分析评论数: {result['total_reviews']}")
-    print()
-    
-    print("检测统计:")
-    print(f"  外部链接: {result['stats']['links']} 个")
-    print(f"  可疑关键词: {result['stats']['keywords']} 个")
-    print(f"  联系方式: {result['stats']['contacts']} 个")
-    
-    # 显示有问题的评论
-    if result['problem_reviews']:
-        print(f"\n发现问题评论 {len(result['problem_reviews'])} 条:")
-        print("-" * 30)
-        
-        for review in result['problem_reviews']:
-            print(f"\n评论 #{review['index']} (第{review['page']}页):")
-            
-            issues = []
-            if review['issues']['links'] > 0:
-                issues.append(f"链接{review['issues']['links']}个")
-            if review['issues']['keywords'] > 0:
-                issues.append(f"关键词{review['issues']['keywords']}个")
-            if review['issues']['contacts'] > 0:
-                issues.append(f"联系方式{review['issues']['contacts']}个")
-            
-            print(f"  问题: {', '.join(issues)}")
-            print(f"  内容: {review['content']}")
-    else:
-        print("\n✓ 没有发现问题评论")
+    if result['details']:
+        print(f"\n可疑评论示例 (前{len(result['details'])}条):")
+        for detail in result['details']:
+            threats_desc = []
+            if detail['threats']['links']:
+                threats_desc.append(f"链接×{detail['threats']['links']}")
+            if detail['threats']['keywords']:
+                threats_desc.append(f"关键词×{detail['threats']['keywords']}")
+            if detail['threats']['contacts']:
+                threats_desc.append(f"联系×{detail['threats']['contacts']}")
+            print(f"\n  [{detail['index']}] 威胁: {', '.join(threats_desc)}")
+            print(f"      {detail['content']}")
+    print("=" * 60)
 
 
 def main():
-
-    print("Steam游戏评论分析工具 - 简化版")
-    print("功能: 爬取Steam游戏评论并检测可疑内容")
-    print("适用于课程设计")
-    print()
+    """
+    独立运行示例
+    演示如何使用本模块分析单款游戏
+    """
+    print("Steam评论威胁分析模块 (课设版)")
+    print("=" * 60)
     
-    while True:
-        print("\n请输入游戏名称 (输入 'q' 退出):")
-        game_name = input("> ").strip()
-        
-        if game_name.lower() == 'q':
-            print("感谢使用，再见！")
-            break
-        
-        if not game_name:
-            print("请输入有效的游戏名称")
-            continue
-        
-        print("\n请输入要分析的评论数量 (默认30条，最多50条):")
-        count_input = input("> ").strip()
-        
-        try:
-            max_reviews = int(count_input) if count_input else 30
-            max_reviews = min(max_reviews, 50)  # 限制最大数量
-        except ValueError:
-            print("输入无效，使用默认值30")
-            max_reviews = 30
-        
-        # 执行分析
-        result = analyze_game_reviews(game_name, max_reviews)
-        
-        # 显示结果
-        print_analysis_result(result)
-        
-        print("\n" + "=" * 50)
+    # 示例：分析Counter-Strike 2
+    print("\n示例：分析 Counter-Strike 2")
+    app_id = input("请输入游戏ID (默认730): ").strip() or "730"
+    title = input("请输入游戏名 (默认Counter-Strike 2): ").strip() or "Counter-Strike 2"
+    max_reviews = input("分析评论数 (默认30): ").strip()
+    
+    try:
+        max_reviews = int(max_reviews) if max_reviews else 30
+    except ValueError:
+        max_reviews = 30
+    
+    print(f"\n开始分析 {title} (ID: {app_id})...")
+    result = analyze_game_threats(app_id, title, max_reviews)
+    print_analysis_result(result)
 
 
 if __name__ == "__main__":
