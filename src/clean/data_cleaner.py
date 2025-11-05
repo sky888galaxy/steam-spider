@@ -2,8 +2,8 @@
 import csv
 import re
 
-INPUT_FILE = "data/steam_topsellers_simple.csv"
-OUTPUT_FILE = "data/steam_topsellers_simple_cleaned.csv"
+INPUT_FILE = "../data/steam_topsellers_simple1.csv"
+OUTPUT_FILE = "../data/steam_topsellers_simple_cleaned.csv"
 
 
 def clean_title(title):
