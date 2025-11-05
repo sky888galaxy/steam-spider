@@ -1,20 +1,13 @@
 # -*- coding: utf-8 -*-
-"""
-Steam游戏数据分析模块
-提供基础统计分析和创新性深度分析功能
-"""
 
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-import re
 from datetime import datetime
-from collections import Counter
 import warnings
 import sys
 import io
-
 warnings.filterwarnings('ignore')
 
 # 强制使用UTF-8编码输出
@@ -22,15 +15,6 @@ if sys.stdout.encoding != 'utf-8':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 if sys.stderr.encoding != 'utf-8':
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
-
-# 配置matplotlib中文字体支持 - 使用字体文件直接加载
-from matplotlib.font_manager import FontProperties
-import matplotlib
-# 直接指定Windows系统的微软雅黑字体文件
-font_path = r'C:\Windows\Fonts\msyh.ttc'  # 微软雅黑常规
-matplotlib.rcParams['font.sans-serif'] = ['Microsoft YaHei']
-matplotlib.rcParams['font.family'] = 'sans-serif'
-matplotlib.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
 sns.set_style("whitegrid")
 # 基础分析函数
 def load_and_preprocess_data(input_file):
@@ -69,7 +53,7 @@ def show_free_rank(input_file, ax):
     bars = ax.bar(range(len(free_games)), ranks, color='#4DAF4A', alpha=0.7)
     ax.set_title("免费游戏热度排行图")
     ax.set_xticks(range(len(free_games)))
-    ax.set_xticklabels(free_games["title"], rotation=45, ha='right')
+    ax.set_xticklabels(free_games["title"], rotation=20, ha='right')
     ax.set_ylabel("排名")
     ax.invert_yaxis()  # 反转y轴，让排名1在顶部
     
@@ -306,7 +290,7 @@ def analyze_tag_discount_pattern(input_file, ax):
                   color=['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'])
     ax.set_title("不同游戏类型的平均折扣率")
     ax.set_xticks(range(len(tags)))
-    ax.set_xticklabels(tags, rotation=45, ha='right')
+    ax.set_xticklabels(tags, rotation=20, ha='right')
     ax.set_ylabel("平均折扣率 (%)")
     
     # 添加数值标签
@@ -346,19 +330,21 @@ def analyze_price_distribution_by_category(input_file, ax):
 
 def show_comprehensive_analysis(input_file):
     """显示综合分析结果"""
+    plt.rcParams['font.family'] = ["SimHei","DejaVu Sans", "STIXGeneral"]
+    plt.rcParams['axes.unicode_minus'] = False
     fig = plt.figure(figsize=(16, 12))
     
     # 创建网格布局
     gs = fig.add_gridspec(3, 3, hspace=0.3, wspace=0.3)
     
     # 基础分析
-    ax1 = fig.add_subplot(gs[0, 0])
+    ax1 = fig.add_subplot(gs[2, 0])
     show_free_rank(input_file, ax1)
     
-    ax2 = fig.add_subplot(gs[0, 1])
+    ax2 = fig.add_subplot(gs[2, 1])
     show_tag_rank(input_file, ["Action"], ax2)
     
-    ax3 = fig.add_subplot(gs[0, 2])
+    ax3 = fig.add_subplot(gs[1, 2])
     show_discount_rank(input_file, ax3)
     
     # 深度分析 - 使用新的更有意义的分析
@@ -368,13 +354,13 @@ def show_comprehensive_analysis(input_file):
     ax5 = fig.add_subplot(gs[1, 1])
     analyze_price_distribution_by_category(input_file, ax5)
     
-    ax6 = fig.add_subplot(gs[1, 2])
+    ax6 = fig.add_subplot(gs[0, 2])
     analyze_tag_discount_pattern(input_file, ax6)
     
-    ax7 = fig.add_subplot(gs[2, 0])
+    ax7 = fig.add_subplot(gs[0, 0])
     analyze_free_vs_paid_characteristics(input_file, ax7)
     
-    ax8 = fig.add_subplot(gs[2, 1])
+    ax8 = fig.add_subplot(gs[0, 1])
     analyze_discount_effectiveness(input_file, ax8)
     
     # 数据统计摘要
@@ -423,6 +409,8 @@ def show_data_summary(input_file, ax):
 
 def show_pictures(input_file, tag):
     """原有的简单图表显示函数（保持兼容性）"""
+    plt.rcParams['font.family'] = ["SimHei","DejaVu Sans", "STIXGeneral"]
+    plt.rcParams['axes.unicode_minus'] = False
     fig, axes = plt.subplots(2, 2, figsize=(14, 8))
     show_free_rank(input_file, axes[0, 0])
     show_tag_rank(input_file, tag, axes[0, 1])
