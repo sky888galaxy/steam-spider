@@ -27,7 +27,7 @@ def load_and_preprocess_data(input_file):
         except UnicodeDecodeError:
             continue
     else:
-        # 如果所有编码都失败，使用错误处理模式1
+        # 如果所有编码都失败，使用错误处理模式
         df = pd.read_csv(input_file, encoding='utf-8', errors='ignore')
     
     # 计算折扣率
