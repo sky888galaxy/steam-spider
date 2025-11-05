@@ -19,6 +19,6 @@ def primary_process(input_file):
             newrow = row + [rank,discount]
             writer.writerow(newrow)
 
-# 测试用
+# 测试用1
 if __name__ == '__main__':
     primary_process('steam_topsellers_simple_cleaned.csv')
