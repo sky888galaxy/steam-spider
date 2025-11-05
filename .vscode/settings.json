@@ -1,0 +1,15 @@
+{
+    "python.terminal.executeInFileDir": true,
+    "files.encoding": "utf8",
+    "files.autoGuessEncoding": true,
+    "[python]": {
+        "files.encoding": "utf8"
+    },
+    "terminal.integrated.defaultProfile.windows": "PowerShell",
+    "terminal.integrated.profiles.windows": {
+        "PowerShell": {
+            "source": "PowerShell",
+            "args": ["-NoExit", "-Command", "chcp 65001"]
+        }
+    }
+}
