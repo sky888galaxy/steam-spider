@@ -1,22 +1,26 @@
-import sys, subprocess, importlib, time, csv
-from typing import Optional
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+简化版（初学友好）Steam 热榜抓取脚本
+逻辑：抓 search 页 -> 提取 appid/title/released/price_text/tags_text -> 逐个调用 appdetails API 获取结构化价格 -> 抓详情页标签并合并 -> 保存 CSV
+去掉了 session/retry 等进阶用法，保留主流程，便于学习与理解。
+"""
 
-def ensure_package(pip_name, import_name=None):
-    if import_name is None:
-        import_name = pip_name
-    try:
-        return importlib.import_module(import_name)
-    except Exception:
-        print(f"模块 {import_name} 未找到，使用 {sys.executable} 安装 {pip_name} ...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", pip_name])
-        return importlib.import_module(import_name)
+import sys
+import time
+import csv
+import re
+import os
 
-# 依赖
-requests = ensure_package("requests", "requests")
-bs4 = ensure_package("beautifulsoup4", "bs4")
-from bs4 import BeautifulSoup
+# 依赖检查（更简单的方式：如果缺包，提示安装并退出）
+try:
+    import requests
+    from bs4 import BeautifulSoup
+except Exception:
+    print("请先安装依赖：pip install requests beautifulsoup4")
+    sys.exit(1)
 
-# 常量
+# ---------------- 常量（可修改） ----------------
 BASE_SEARCH = "https://store.steampowered.com/search/"
 APP_URL = "https://store.steampowered.com/app/{appid}/"
 APPDETAILS_API = "https://store.steampowered.com/api/appdetails"
@@ -26,47 +30,41 @@ HEADERS = {
                   "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 
-# 创建稳健 session（不使用系统代理，带重试）
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+OUT_CSV = "steam_topsellers_simple.csv"
+PAGES_TO_SCRAPE = 1       # 抓取第几页（默认 1）
+DELAY = 1.0               # 请求间隔（秒），课堂练习用小延迟即可
+# ------------------------------------------------
 
-session = requests.Session()
-session.headers.update(HEADERS)
-session.trust_env = False   # 忽略环境代理（如需代理请修改）
-session.proxies = {}
-
-retry_strategy = Retry(
-    total=4,
-    backoff_factor=1,
-    status_forcelist=[429,500,502,503,504],
-    allowed_methods=["HEAD","GET","OPTIONS"]
-)
-adapter = HTTPAdapter(max_retries=retry_strategy)
-session.mount("https://", adapter)
-session.mount("http://", adapter)
-
+# ---------------- 基本网络函数（第1-5章、7章） ----------------
 def fetch_search_page(page=1, filter_name="topsellers"):
+    """抓取 Steam 搜索页 HTML（使用简单的 requests.get）"""
     params = {"filter": filter_name, "page": page}
-    timeout = (8, 30)
-    r = session.get(BASE_SEARCH, params=params, timeout=timeout)
+    r = requests.get(BASE_SEARCH, params=params, headers=HEADERS, timeout=(8, 30))
     r.raise_for_status()
     return r.text
 
 def parse_search_html(html):
+    """
+    解析搜索页（BeautifulSoup）—— 返回按顺序的条目字典列表
+    字段：appid, title, released, price_text, tags_text
+    （对应第4章 字符串与容器，第7章 BeautifulSoup/字符串处理）
+    """
     soup = BeautifulSoup(html, "html.parser")
     rows = soup.select("a.search_result_row")
     out = []
     for a in rows:
         appid = a.get("data-ds-appid") or a.get("data-ds-packageid") or ""
-        title = (a.select_one(".title").get_text(strip=True) if a.select_one(".title") else "")
-        released = (a.select_one(".search_released").get_text(strip=True) if a.select_one(".search_released") else "")
+        title = a.select_one(".title").get_text(strip=True) if a.select_one(".title") else ""
+        released = a.select_one(".search_released").get_text(strip=True) if a.select_one(".search_released") else ""
         price_text = ""
         pe = a.select_one(".search_price")
         if pe:
+            # 把换行与多空格规整掉
             price_text = " ".join(pe.get_text(" ", strip=True).split())
         tags_text = ""
         te = a.select_one(".search_tags")
         if te:
+            # 用竖线分割并转成逗号分隔
             tags_text = ", ".join(t.strip() for t in te.get_text(separator="|").split("|") if t.strip())
         out.append({
             "appid": appid,
@@ -77,9 +75,15 @@ def parse_search_html(html):
         })
     return out
 
-def get_price_from_api(appid: str, cc="US", lang="en") -> Optional[dict]:
+# ---------------- API / 详情页抓取（第1-5章） ----------------
+def get_price_from_api(appid, cc="CN", lang="schinese"):
+    """
+    调用 appdetails API，若返回 price_overview 则解析并返回字典。
+    返回 None 表示没有 price_overview（例如免费或 API 不提供）。
+    """
     try:
-        resp = session.get(APPDETAILS_API, params={"appids": appid, "cc": cc, "l": lang}, timeout=(8,15))
+        resp = requests.get(APPDETAILS_API, params={"appids": appid, "cc": cc, "l": lang},
+                            headers=HEADERS, timeout=(8, 15))
         resp.raise_for_status()
         data = resp.json()
         info = data.get(str(appid), {})
@@ -87,103 +91,79 @@ def get_price_from_api(appid: str, cc="US", lang="en") -> Optional[dict]:
             return None
         d = info.get("data", {})
         po = d.get("price_overview")
-        if po:
-            return {
-                "currency": po.get("currency"),
-                "initial": po.get("initial")/100.0 if po.get("initial") is not None else None,
-                "final": po.get("final")/100.0 if po.get("final") is not None else None,
-                "discount_percent": po.get("discount_percent")
-            }
-        # free / 无 price_overview
-        return None
+        if not po:
+            return None
+        return {
+            "currency": po.get("currency"),
+            "initial": po.get("initial")/100.0 if po.get("initial") is not None else None,
+            "final": po.get("final")/100.0 if po.get("final") is not None else None,
+            "discount_percent": po.get("discount_percent")
+        }
     except Exception:
+        # 这里用简单的异常处理，便于初学者看到失败时的行为
         return None
 
-def get_tags_from_app_page(appid: str) -> str:
+def get_tags_from_app_page(appid):
+    """抓取详情页的热门标签（简单实现，主要目的是得到页面上的标签）"""
     try:
         url = APP_URL.format(appid=appid)
-        r = session.get(url, params={"l":"english"}, timeout=(8,20))
+        r = requests.get(url, params={"l":"english"}, headers=HEADERS, timeout=(8, 20))
         r.raise_for_status()
         soup = BeautifulSoup(r.text, "html.parser")
         tags = []
         for a in soup.select("div.glance_tags.popular_tags a.app_tag"):
             t = a.get_text(strip=True)
-            if t: tags.append(t)
+            if t:
+                tags.append(t)
         if not tags:
+            # 备用选择器：有时候结构变化，退化为更宽泛的选择器
             for a in soup.select("div.glance_tags a"):
                 t = a.get_text(strip=True)
-                if t and len(t) < 40: tags.append(t)
+                if t and len(t) < 40:
+                    tags.append(t)
+        # 去重并保持顺序
         tags = list(dict.fromkeys(tags))
         return ", ".join(tags)
     except Exception:
         return ""
 
-def get_extra_game_info(appid: str) -> dict:
-    """
-    简单函数：从游戏页面获取额外信息（发售日期、评分等）
-    返回: {'release_date': '发售日期', 'review_score': '评分', 'developer': '开发商'}
-    """
-    try:
-        url = APP_URL.format(appid=appid)
-        r = session.get(url, params={"l":"english"}, timeout=(8,20))
-        r.raise_for_status()
-        soup = BeautifulSoup(r.text, "html.parser")
-        
-        info = {'release_date': '', 'review_score': '', 'developer': ''}
-        
-        # 获取发售日期 (更准确的格式)
-        release_elem = soup.select_one("div.release_date .date")
-        if release_elem:
-            info['release_date'] = release_elem.get_text(strip=True)
-        
-        # 获取评分信息
-        review_elem = soup.select_one("div.user_reviews_summary_row .game_review_summary")
-        if review_elem:
-            # 获取评分描述（如 "Very Positive"）
-            review_text = review_elem.get_text(strip=True)
-            info['review_score'] = review_text
-        
-        # 获取开发商
-        dev_elem = soup.select_one("div.dev_row .summary.column a")
-        if dev_elem:
-            info['developer'] = dev_elem.get_text(strip=True)
-        
-        return info
-    except Exception:
-        return {'release_date': '', 'review_score': '', 'developer': ''}
-
-def merge_tags(search_tags: str, page_tags: str) -> str:
+# ---------------- 工具函数（第4章，第7章） ----------------
+def merge_tags(search_tags, page_tags):
+    """简单合并去重，保持出现顺序"""
     seen = []
     for t in (search_tags or "").split(","):
         t = t.strip()
-        if t and t not in seen: seen.append(t)
+        if t and t not in seen:
+            seen.append(t)
     for t in (page_tags or "").split(","):
         t = t.strip()
-        if t and t not in seen: seen.append(t)
+        if t and t not in seen:
+            seen.append(t)
     return ", ".join(seen)
 
-def price_fallback_from_text(price_text: str):
-    # 简单回退：若含数字就提取最后一组数字（可能包含货币符），否则返回 empty
+def price_fallback_from_text(price_text):
+    """
+    简单回退：从搜索页 price_text 中用正则提取数字，用于初学者练习正则（第7章）
+    如果包含 Free/免费，则返回 ('0','0')
+    """
     if not price_text:
         return ("","")
-    s = price_text.replace("\u2009"," ").strip()  # 去掉特殊空格
-    # 常见形式："¥ 68.00", "¥9.00¥ 29.00", "Free", "Free to Play", "On Demand"
+    s = price_text.replace("\u2009", " ").strip()
     if any(tok.lower().startswith("free") for tok in s.split()):
         return ("0", "0")
-    # 如果含两个货币/价位，尝试取最后一个为 current, 前一个为 original
-    import re
     nums = re.findall(r"[\d\.,]+", s)
     if not nums:
         return (s, "")
     if len(nums) == 1:
-        return (nums[0].replace(",",""), "")
-    # >=2
-    original = nums[-2].replace(",","")
-    current = nums[-1].replace(",","")
+        return (nums[0].replace(",", ""), "")
+    original = nums[-2].replace(",", "")
+    current = nums[-1].replace(",", "")
     return (current, original)
 
-def save_csv(rows, filename="../data/steam_topsellers_simple.csv"):
-    keys = ["appid","title","released","current_price","original_price","tags","release_date","review_score","developer"]
+# ---------------- 保存 CSV（第8章） ----------------
+def save_csv(rows, filename=OUT_CSV):
+    keys = ["appid","title","released","current_price","original_price","tags"]
+    os.makedirs(os.path.dirname(filename) or ".", exist_ok=True)
     with open(filename, "w", newline='', encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=keys)
         writer.writeheader()
@@ -194,66 +174,60 @@ def save_csv(rows, filename="../data/steam_topsellers_simple.csv"):
                 "released": r.get("released",""),
                 "current_price": r.get("current_price",""),
                 "original_price": r.get("original_price",""),
-                "tags": r.get("tags",""),
-                "release_date": r.get("release_date",""),
-                "review_score": r.get("review_score",""),
-                "developer": r.get("developer","")
+                "tags": r.get("tags","")
             })
 
+# ---------------- 主流程（第2、3章：程序结构） ----------------
 def main():
     print("当前 Python 解释器：", sys.executable)
-    pages_to_scrape = 3   # 增加到3页，获取更多数据（约75个游戏）
     all_items = []
-    for p in range(1, pages_to_scrape+1):
+    for p in range(1, PAGES_TO_SCRAPE + 1):
         print(f"抓取搜索页 page {p} ...")
-        html = fetch_search_page(page=p, filter_name="topsellers")
-        items = parse_search_html(html)
-        all_items.extend(items)
-        print(f"  第{p}页获取到 {len(items)} 个游戏")
-        time.sleep(0.8)  # 稍微降低延迟以提高效率
+        try:
+            html = fetch_search_page(page=p, filter_name="topsellers")
+            items = parse_search_html(html)
+            all_items.extend(items)
+            print(f"本页抓到 {len(items)} 条")
+        except Exception as e:
+            print("抓取搜索页出错：", e)
+        time.sleep(DELAY)
 
     out = []
     for i, it in enumerate(all_items, 1):
-        appid = it.get("appid","")
-        title = it.get("title","")
+        appid = it.get("appid","").strip()
+        title = it.get("title","").strip()
         print(f"[{i}/{len(all_items)}] {title[:60]}  (appid={appid})")
         record = {"appid": appid, "title": title, "released": it.get("released",""),
-                  "current_price": "", "original_price": "", "tags": "",
-                  "release_date": "", "review_score": "", "developer": ""}
+                  "current_price": "", "original_price": "", "tags": ""}
 
-        # 价格：优先 API（结构化），失败回退到搜索页文本解析
         if appid:
-            price_info = get_price_from_api(appid, cc="US", lang="en")
+            # 尝试 API（优先）
+            price_info = get_price_from_api(appid, cc="CN", lang="schinese")
             if price_info and price_info.get("final") is not None:
                 record["current_price"] = str(price_info.get("final"))
                 record["original_price"] = str(price_info.get("initial")) if price_info.get("initial") is not None else ""
             else:
+                # API 不可用时回退到搜索页的价格文本
                 cur, orig = price_fallback_from_text(it.get("price_text",""))
                 record["current_price"] = cur
                 record["original_price"] = orig
-            
-            # 获取额外信息（发售日期、评分、开发商）
-            extra_info = get_extra_game_info(appid)
-            record["release_date"] = extra_info.get("release_date", "")
-            record["review_score"] = extra_info.get("review_score", "")
-            record["developer"] = extra_info.get("developer", "")
-            
-            # 标签：优先详情页的完整标签，若为空用搜索页标签
+
+            # 抓详情页标签并合并（若失败则使用搜索页标签）
             tags_page = get_tags_from_app_page(appid)
             merged = merge_tags(it.get("tags_text",""), tags_page)
             record["tags"] = merged
         else:
-            # 无 appid（package/bundle）：用搜索页价格文本/标签回退
+            # 无 appid（bundle/package），使用搜索页信息回退
             cur, orig = price_fallback_from_text(it.get("price_text",""))
             record["current_price"] = cur
             record["original_price"] = orig
             record["tags"] = it.get("tags_text","")
 
         out.append(record)
-        time.sleep(0.7)  # 降低延迟提高效率，但保持礼貌
+        time.sleep(DELAY)
 
     save_csv(out)
-    print(f"完成，保存 {len(out)} 条到 ../data/steam_topsellers_simple.csv")
+    print(f"完成，保存 {len(out)} 条到 {OUT_CSV}")
 
 if __name__ == "__main__":
     main()
