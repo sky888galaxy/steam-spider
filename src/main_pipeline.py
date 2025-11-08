@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+<<<<<<< HEAD
+=======
+"""
+Steam数据分析主流程控制器（已针对简化版 steam_data_extractor 调整）
+功能：编排数据抓取→清洗→评论分析→数据分析的完整流程
+"""
+>>>>>>> c68920d58af9dc60777d938238f2ba8c367779ae
 
 import os
 import sys
@@ -11,6 +18,10 @@ BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = BASE_DIR / "data"
 sys.path.insert(0, str(BASE_DIR / "src"))
 
+<<<<<<< HEAD
+=======
+# 注意：简化版 steam_data_extractor 已移除了 get_extra_game_info
+>>>>>>> c68920d58af9dc60777d938238f2ba8c367779ae
 from steam_data_extractor import (
     fetch_search_page,
     parse_search_html,
@@ -25,6 +36,10 @@ from comments.simple_steam_crawler_easy import analyze_game_threats
 
 
 class SteamAnalysisPipeline:
+<<<<<<< HEAD
+=======
+    """Steam数据分析流水线"""
+>>>>>>> c68920d58af9dc60777d938238f2ba8c367779ae
 
     def __init__(self):
         self.raw_csv = DATA_DIR / "steam_topsellers_simple.csv"
