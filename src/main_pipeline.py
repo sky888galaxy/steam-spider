@@ -77,6 +77,7 @@ class SteamAnalysisPipeline:
                 record["current_price"] = cur
                 record["original_price"] = orig
                 record["tags"] = it.get("tags_text", "")
+<<<<<<< HEAD
             out.append(record)
             time.sleep(1.0)
         save_csv(out, str(self.raw_csv))
