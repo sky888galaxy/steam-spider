@@ -34,21 +34,20 @@ class SteamAnalysisPipeline:
         self.games_data = []
 
     def step1_extract_games(self, pages=1):
-        print("\n" + "=" * 60)
-        print("【步骤 1/4】抓取Steam游戏数据")
-        print("=" * 60)
+        print("\n--- 步骤 1/4：抓取 Steam 游戏数据 ---")
         all_items = []
         for p in range(1, pages + 1):
-            print(f"抓取搜索页 page {p} ...")
+            print(f"抓取搜索页 {p} ...")
             html = fetch_search_page(page=p, filter_name="topsellers")
             items = parse_search_html(html)
             all_items.extend(items)
-            time.sleep(1.0)
+            time.sleep(0.2)
+
         out = []
         for i, it in enumerate(all_items, 1):
             appid = it.get("appid", "")
             title = it.get("title", "")
-            print(f"[{i}/{len(all_items)}] {title[:50]}  (appid={appid})")
+            print(f"[{i}/{len(all_items)}] {title[:50]} (appid={appid})")
             record = {
                 "appid": appid,
                 "title": title,
@@ -80,15 +79,14 @@ class SteamAnalysisPipeline:
                 record["tags"] = it.get("tags_text", "")
             out.append(record)
             time.sleep(1.0)
+
         save_csv(out, str(self.raw_csv))
         self.games_data = out
-        print(f"\n✓ 完成：保存 {len(out)} 条游戏数据到 {self.raw_csv.name}")
+        print(f"完成：已保存 {len(out)} 条游戏数据 -> {self.raw_csv.name}")
         return out
 
     def step2_clean_data(self):
-        print("\n" + "=" * 60)
-        print("【步骤 2/4】清洗数据")
-        print("=" * 60)
+        print("\n--- 步骤 2/4：清洗数据 ---")
         import clean.data_cleaner as cleaner
         original_input = getattr(cleaner, "INPUT_FILE", None)
         original_output = getattr(cleaner, "OUTPUT_FILE", None)
@@ -96,7 +94,7 @@ class SteamAnalysisPipeline:
         cleaner.OUTPUT_FILE = str(self.cleaned_csv)
         try:
             clean_data()
-            print(f"\n✓ 完成：清洗后数据保存到 {self.cleaned_csv.name}")
+            print(f"完成：清洗后的数据已保存 -> {self.cleaned_csv.name}")
         finally:
             if original_input is not None:
                 cleaner.INPUT_FILE = original_input
@@ -104,31 +102,29 @@ class SteamAnalysisPipeline:
                 cleaner.OUTPUT_FILE = original_output
 
     def step3_analyze_comments(self, max_games=5, max_reviews_per_game=20):
-        print("\n" + "=" * 60)
-        print(f"【步骤 3/4】分析游戏评论威胁（前{max_games}款游戏）")
-        print("=" * 60)
+        print("\n--- 步骤 3/4：分析游戏评论（前 {0} 款） ---".format(max_games))
         try:
             with open(self.cleaned_csv, 'r', encoding='utf-8-sig') as f:
                 games = list(csv.DictReader(f))[:max_games]
         except FileNotFoundError:
             print(f"错误：找不到清洗后的文件 {self.cleaned_csv}")
             return []
+
         results = []
         for i, game in enumerate(games, 1):
             app_id = game.get('appid', '').strip()
             title = game.get('title', '').strip()
             if not app_id or not title:
                 continue
-            print(f"\n[{i}/{len(games)}] 正在分析: {title}")
+            print(f"[{i}/{len(games)}] 分析：{title}")
             result = analyze_game_threats(app_id, title, max_reviews_per_game)
             if result:
                 results.append(result)
-                print(f"  ✓ 完成: 分析{result['total_reviews']}条评论, "
-                      f"发现{result['suspicious_reviews']}条可疑 "
-                      f"({result['threat_rate'] * 100:.1f}%)")
+                print(f"  完成：分析 {result['total_reviews']} 条评论，{result['suspicious_reviews']} 条可疑（{result['threat_rate'] * 100:.1f}%）")
             else:
-                print(f"  ✗ 无法获取评论")
+                print("  无法获取评论")
             time.sleep(2)
+
         if results:
             with open(self.comment_analysis_csv, 'w', newline='', encoding='utf-8-sig') as f:
                 fieldnames = ['appid', 'title', 'total_reviews', 'suspicious_reviews',
@@ -150,7 +146,8 @@ class SteamAnalysisPipeline:
                         'chinese_reviews': r.get('language_stats', {}).get('chinese', 0),
                         'english_reviews': r.get('language_stats', {}).get('english', 0)
                     })
-            print(f"\n✓ 完成：评论分析结果保存到 {self.comment_analysis_csv.name}")
+            print(f"完成：评论分析结果已保存 -> {self.comment_analysis_csv.name}")
+
             suspicious_details = []
             for r in results:
                 if 'details' in r and r['details']:
@@ -178,16 +175,13 @@ class SteamAnalysisPipeline:
                     writer = csv.DictWriter(f, fieldnames=fieldnames)
                     writer.writeheader()
                     writer.writerows(suspicious_details)
-                print(f"✓ 完成：可疑评论详情保存到 {self.suspicious_reviews_csv.name}")
-                print(f"  共记录 {len(suspicious_details)} 条可疑评论")
+                print(f"完成：可疑评论详情已保存 -> {self.suspicious_reviews_csv.name} (共 {len(suspicious_details)} 条)")
         return results
 
     def step4_visualize_analysis(self, show_plots=True):
-        print("\n" + "=" * 60)
-        print("【步骤 4/4】数据分析与可视化")
-        print("=" * 60)
+        print("\n--- 步骤 4/4：数据分析与可视化 ---")
         if not show_plots:
-            print(f"✓ 完成：跳过图表显示")
+            print("已跳过图表显示")
             return
         analysis_dir = BASE_DIR / "src" / "analysis part"
         if str(analysis_dir) not in sys.path:
@@ -195,22 +189,15 @@ class SteamAnalysisPipeline:
         try:
             from data_analysis import run_analysis
             run_analysis(str(self.cleaned_csv))
-            print(f"\n✓ 完成：数据分析与可视化")
+            print("完成：数据分析与可视化")
         except Exception as e:
-            print(f"⚠ 可视化出错: {e}")
+            print(f"可视化出错: {e}")
             import traceback
             traceback.print_exc()
 
     def run_full_pipeline(self, pages=3, max_comment_games=15, max_reviews=50, show_plots=True):
-        print("\n" + "=" * 70)
-        print("🎮 我超想你steam spider 🕷️")
-        print("=" * 70)
-        print(f"配置:")
-        print(f"  - 抓取页数: {pages}")
-        print(f"  - 评论分析游戏数: {max_comment_games}")
-        print(f"  - 每款游戏评论数: {max_reviews}")
-        print(f"  - 显示图表: {'是' if show_plots else '否'}")
-        print("=" * 70)
+        print("--- Steam 数据分析流水线：开始 ---")
+        print(f"配置: 抓取页数={pages}, 评论分析游戏数={max_comment_games}, 每款评论数={max_reviews}, 显示图表={show_plots}")
         start_time = time.time()
         try:
             games = self.step1_extract_games(pages=pages)
@@ -221,27 +208,23 @@ class SteamAnalysisPipeline:
             )
             self.step4_visualize_analysis(show_plots=show_plots)
             elapsed = time.time() - start_time
-            print("\n" + "=" * 70)
-            print("流水线执行完成！")
-            print("=" * 70)
-            print(f"总耗时: {elapsed:.1f}秒")
-            print(f"游戏数据: {len(games)} 条")
+            print("\n--- 执行完成 ---")
+            print(f"总耗时: {elapsed:.1f} 秒")
+            print(f"抓取到游戏: {len(games)} 条")
             print(f"评论分析: {len(comment_results)} 款游戏")
-            print(f"\n生成文件:")
+            print("生成文件:")
             print(f"  - {self.raw_csv}")
             print(f"  - {self.cleaned_csv}")
             print(f"  - {self.comment_analysis_csv}")
             if self.suspicious_reviews_csv.exists():
                 print(f"  - {self.suspicious_reviews_csv}")
-            print("=" * 70)
-            print("\n🎉 我超想你steam spider 运行完成！🎉")
-            print("=" * 70)
+            print("--- 结束 ---")
             return True
         except KeyboardInterrupt:
-            print("\n\n用户中断执行")
+            print("用户中断执行")
             return False
         except Exception as e:
-            print(f"\n\n错误: {e}")
+            print(f"错误: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -249,7 +232,7 @@ class SteamAnalysisPipeline:
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description='Steam数据分析流水线')
+    parser = argparse.ArgumentParser(description='Steam 数据分析流水线')
     parser.add_argument('--pages', type=int, default=3, help='抓取页数 (默认3)')
     parser.add_argument('--games', type=int, default=15, help='评论分析游戏数 (默认15)')
     parser.add_argument('--reviews', type=int, default=50, help='每款游戏评论数 (默认50)')
