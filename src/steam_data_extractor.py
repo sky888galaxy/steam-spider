@@ -22,7 +22,7 @@ HEADERS = {
 
 OUT_CSV = "steam_topsellers_simple.csv"
 PAGES_TO_SCRAPE = 1
-DELAY = 1.0
+DELAY = 0.2
 
 
 def fetch_search_page(page=1, filter_name="topsellers"):
@@ -70,10 +70,8 @@ def get_price_from_api(appid, cc="CN", lang="schinese"):
         if not po:
             return None
         return {
-            "currency": po.get("currency"),
             "initial": po.get("initial")/100.0 if po.get("initial") is not None else None,
             "final": po.get("final")/100.0 if po.get("final") is not None else None,
-            "discount_percent": po.get("discount_percent")
         }
     except Exception:
         return None
@@ -115,8 +113,6 @@ def price_fallback_from_text(price_text):
     if not price_text:
         return ("","")
     s = price_text.replace("\u2009", " ").strip()
-    if any(tok.lower().startswith("free") for tok in s.split()):
-        return ("0", "0")
     nums = re.findall(r"[\d\.,]+", s)
     if not nums:
         return (s, "")
@@ -141,3 +137,56 @@ def save_csv(rows, filename=OUT_CSV):
                 "original_price": r.get("original_price",""),
                 "tags": r.get("tags","")
             })
+
+
+def main():
+    print("Python解释器：", sys.executable)
+    all_items = []
+    for p in range(1, PAGES_TO_SCRAPE + 1):
+        print(f"抓取搜索页 page {p} ...")
+        try:
+            html = fetch_search_page(page=p, filter_name="topsellers")
+            items = parse_search_html(html)
+            all_items.extend(items)
+            print(f"本页抓到 {len(items)} 条")
+        except Exception as e:
+            print("抓取搜索页出错：", e)
+        time.sleep(DELAY)
+
+    out = []
+    for i, it in enumerate(all_items, 1):
+        appid = it.get("appid", "").strip()
+        title = it.get("title", "").strip()
+        print(f"[{i}/{len(all_items)}] {title[:60]}  (appid={appid})")
+        record = {"appid": appid, "title": title, "released": it.get("released", ""),
+                  "current_price": "", "original_price": "", "tags": ""}
+
+        if appid:
+            price_info = get_price_from_api(appid, cc="CN", lang="schinese")
+            if price_info and price_info.get("final") is not None:
+                record["current_price"] = str(price_info.get("final"))
+                record["original_price"] = str(price_info.get("initial")) if price_info.get(
+                    "initial") is not None else ""
+            else:
+                cur, orig = price_fallback_from_text(it.get("price_text", ""))
+                record["current_price"] = cur
+                record["original_price"] = orig
+
+            tags_page = get_tags_from_app_page(appid)
+            merged = merge_tags(it.get("tags_text", ""), tags_page)
+            record["tags"] = merged
+        else:
+            cur, orig = price_fallback_from_text(it.get("price_text", ""))
+            record["current_price"] = cur
+            record["original_price"] = orig
+            record["tags"] = it.get("tags_text", "")
+
+        out.append(record)
+        time.sleep(DELAY)
+
+    save_csv(out)
+    print(f"完成，保存 {len(out)} 条到 {OUT_CSV}")
+
+
+if __name__ == "__main__":
+    main()

@@ -43,7 +43,7 @@ def show_free_rank(input_file, ax):
     ax.set_xticks(range(len(free_games)))
     ax.set_xticklabels(free_games["title"], rotation=20, ha='right')
     ax.set_ylabel("排名")
-    ax.invert_yaxis()  # 反转y轴，让排名1在顶部
+    ax.invert_yaxis()
     
     for i, bar in enumerate(bars):
         ax.text(bar.get_x() + bar.get_width()/2, bar.get_height()/2, 
@@ -216,7 +216,7 @@ def analyze_genre_popularity_trend(input_file, ax):
     
     colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7']
     for i, (genre, counts) in enumerate(year_genre_data.items()):
-        if sum(counts) > 0:  # 只显示有数据的类型
+        if sum(counts) > 0:
             ax.plot(years, counts, marker='o', linewidth=2, 
                    label=genre, color=colors[i % len(colors)])
     
