@@ -196,7 +196,7 @@ class SteamAnalysisPipeline:
             traceback.print_exc()
 
     def run_full_pipeline(self, pages=3, max_comment_games=15, max_reviews=50, show_plots=True):
-        print("--- Steam 数据分析流水线：开始 ---")
+        print("--- 我超你SteamSpider ---")
         print(f"配置: 抓取页数={pages}, 评论分析游戏数={max_comment_games}, 每款评论数={max_reviews}, 显示图表={show_plots}")
         start_time = time.time()
         try:
